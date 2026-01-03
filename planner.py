@@ -1,4 +1,4 @@
-def planner(repo_event: dict)-> dict:
+def planner_agent(repo_event: dict)-> dict:
     """
     These take the input as the 
     repo_event :
