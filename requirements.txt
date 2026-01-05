@@ -1,0 +1,11 @@
+# Core testing
+pytest>=7.0
+
+# Optional (safe to include now, used later)
+pytest-json-report>=1.5
+
+# LLM / agent work (used in later days)
+openai>=1.0.0
+
+# Utilities
+python-dotenv>=1.0
