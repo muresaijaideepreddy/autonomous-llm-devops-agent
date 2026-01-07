@@ -1,151 +1,119 @@
 """
 Tester Agent
 ============
+Auto-generates pytest test cases using Google Gemini LLM.
 
-Responsibility:
----------------
-Automatically generates pytest test cases using an LLM based on
-the Planner Agent’s output and the source code under test.
+Responsibilities:
+- Read planner output
+- Read relevant source code
+- Prompt Gemini to generate pytest tests
+- Persist tests to /tests directory
+- Return strict schema output to orchestrator
 
-Role in Pipeline:
------------------
-Planner → Tester → Executor
-
-- Planner decides *what* to test
-- Tester generates *how* to test (pytest files)
-- Executor runs the tests
-
-This agent is designed to be deterministic in structure,
-but intelligent in test generation via an LLM.
+Design Notes:
+- Uses Gemini free API (no billing required)
+- Deterministic temperature for CI stability
+- Clean fallback if source file missing
 """
 
 import os
 from typing import Dict, List
-from openai import OpenAI
+import google.generativeai as genai
 
-# Initialize OpenAI client (expects OPENAI_API_KEY in environment)
-client = OpenAI()
+# 🔹 Configure Gemini
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    raise EnvironmentError("GEMINI_API_KEY environment variable not set")
 
+genai.configure(api_key=GEMINI_API_KEY)
 
-def generate_tests_with_llm(
-    module: str,
-    source_code: str,
-    risk_level: str
-) -> str:
+MODEL_NAME = "gemini-1.5-flash"
+
+def generate_tests_with_gemini(prompt: str) -> str:
     """
-    Calls OpenAI to generate pytest tests for a given module.
-
-    Args:
-        module (str): Name of the module under test (e.g., "payments")
-        source_code (str): Source code of the module
-        risk_level (str): Risk level from planner ("low" | "medium" | "high")
-
-    Returns:
-        str: Generated pytest test code
+    Calls Gemini LLM to generate pytest-compatible test code.
     """
-
-    prompt = f"""
-You are a senior QA engineer.
-
-Task:
-Generate production-quality pytest test cases for the following Python module.
-
-Module name: {module}
-Risk level: {risk_level}
-
-Requirements:
-- Use pytest
-- Cover normal, edge, and failure cases
-- Follow best testing practices
-- Do NOT include explanations, only code
-- Assume module is imported correctly
-
-Source Code:
-{source_code}
-"""
-
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "You generate high-quality automated tests."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.2
+    model = genai.GenerativeModel(MODEL_NAME)
+    response = model.generate_content(
+        prompt,
+        generation_config={
+            "temperature": 0.2,
+            "max_output_tokens": 1024
+        }
     )
-
-    return response.choices[0].message.content.strip()
+    return response.text.strip()
 
 
 def tester_agent(plan: Dict) -> Dict:
     """
-    Tester Agent (LLM-Based Test Generator)
+    Tester Agent
+    ------------
+    Input:
+        plan:
+            modules_to_test: List[str]
+            test_types: List[str]
+            risk_level: str
 
-    Input Schema (from Planner Agent):
-    ---------------------------------
-    {
-        "modules_to_test": ["payments"],
-        "test_types": ["unit", "edge"],
-        "risk_level": "high"
-    }
-
-    Output Schema:
-    --------------
-    {
-        "test_files_created": ["tests/test_payments_auto.py"],
-        "num_tests_generated": 3
-    }
+    Output:
+        {
+            "test_files_created": List[str],
+            "num_tests_generated": int
+        }
     """
 
     modules: List[str] = plan.get("modules_to_test", [])
     risk_level: str = plan.get("risk_level", "low")
 
-    # Ensure tests directory exists
     os.makedirs("tests", exist_ok=True)
 
     created_files: List[str] = []
-    total_tests: int = 0
+    total_tests = 0
 
     for module in modules:
         source_path = f"src/{module}.py"
 
-        # Skip if source file does not exist
         if not os.path.exists(source_path):
+            print(f"⚠️ Source file not found: {source_path}")
             continue
 
-        # Read source code
+        # 🔹 Read source code
         with open(source_path, "r") as f:
             source_code = f.read()
 
-        # Generate tests using LLM
-        test_code = generate_tests_with_llm(
-            module=module,
-            source_code=source_code,
-            risk_level=risk_level
-        )
+        # 🔹 Build LLM prompt
+        prompt = f"""
+You are a senior QA engineer.
 
-        # Save generated tests
+Generate pytest test cases for the following Python module.
+
+Module name: {module}
+Risk level: {risk_level}
+
+Rules:
+- Use pytest
+- Include edge cases
+- Follow best testing practices
+- Only output valid Python code
+- Do NOT include explanations or markdown
+
+Python code:
+{source_code}
+"""
+
+        # 🔹 Call Gemini
+        test_code = generate_tests_with_gemini(prompt)
+
+        # 🔹 Save generated tests
         test_file_path = f"tests/test_{module}_auto.py"
         with open(test_file_path, "w") as f:
             f.write(test_code)
 
         created_files.append(test_file_path)
-
-        # Simple heuristic to count tests
         total_tests += test_code.count("def test_")
+
+        print(f"✅ Generated tests for {module}: {test_file_path}")
 
     return {
         "test_files_created": created_files,
         "num_tests_generated": total_tests
     }
-
-
-# 🔹 Manual test hook (for local debugging only)
-if __name__ == "__main__":
-    sample_plan = {
-        "modules_to_test": ["payments"],
-        "test_types": ["unit", "edge"],
-        "risk_level": "high"
-    }
-
-    output = tester_agent(sample_plan)
-    print(output)
