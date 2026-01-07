@@ -6,7 +6,7 @@ pytest-json-report>=1.5
 
 # LLM / agent work (used in later days)
 openai>=1.0.0
-google-generativeai>=0.4.0
+google-generativeai>=0.3.0
 
 
 # Utilities
