@@ -31,15 +31,18 @@ def run_pipeline(repo_event: dict) -> dict:
     # 🔹 2. TESTER AGENT
     print("\n🔹 Running Tester Agent...")
     tester_output = tester_agent(planner_output)
+
+    execution_input = {
+        "execution_strategy": "pytest",
+        "test_files": tester_output["test_files_created"]
+    }
+
     pipeline_state["tester_output"] = tester_output
     print("Tester Output:", tester_output)
 
     # 🔹 3. EXECUTOR AGENT
     print("\n🔹 Running Executor Agent...")
-    execution_input = {
-        "execution_strategy": "pytest"
-    }
-
+     
     executor_output = executor_agent(execution_input)
     pipeline_state["executor_output"] = executor_output
     print("Executor Output:", executor_output)
