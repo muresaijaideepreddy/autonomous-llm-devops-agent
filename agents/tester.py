@@ -11,12 +11,15 @@ Key features:
 - Retry mechanism with fallback tests
 - Production-grade logging and structure
 """
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 import os
 import ast
 from typing import Dict, List
 from google import genai
-
 
 # -----------------------------
 # CONFIGURATION

@@ -8,15 +8,19 @@ sys.path.insert(0, SRC_DIR)
 
 from payments import *
 
-def test_process_payment_positive_amount_returns_true():
-    amount = 100
-    assert process_payment(amount) is True
 
-def test_process_payment_zero_amount_returns_true():
-    amount = 0
-    assert process_payment(amount) is True
+def test_process_payment_positive_amount_success():
+    assert process_payment(100) is True
 
-def test_process_payment_negative_amount_raises_value_error():
-    amount = -10
+
+def test_process_payment_zero_amount_success():
+    assert process_payment(0) is True
+
+
+def test_process_payment_negative_amount_raises_error():
     with pytest.raises(ValueError, match="Amount cannot be negative"):
-        process_payment(amount)
+        process_payment(-50)
+
+
+def test_process_payment_large_amount_success():
+    assert process_payment(999999) is True
