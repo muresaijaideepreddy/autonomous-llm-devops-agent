@@ -20,8 +20,6 @@ Planner Agent → Tester Agent → Executor Agent
 ↑ ↓
 └────────── Feedback & Logs ────┘
 
-yaml
-Copy code
 
 ---
 
@@ -46,8 +44,7 @@ AgenticAI/
 ├── .env.example
 └── README.md
 
-yaml
-Copy code
+
 
 ---
 
