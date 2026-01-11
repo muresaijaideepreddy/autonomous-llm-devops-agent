@@ -1,7 +1,7 @@
 from agents.planner import planner_agent
 from agents.tester import tester_agent
 from agents.executor import executor_agent
-from agents.failure_analyzer import failure_analysis_agent
+from agents.failure_analysis import failure_analysis_agent
 from datetime import datetime
 import json
 import os
