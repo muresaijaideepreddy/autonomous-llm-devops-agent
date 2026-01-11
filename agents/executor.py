@@ -1,35 +1,27 @@
 import subprocess
 import os
 import time
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 
-def executor_agent(test_info: dict) -> dict:
+def executor_agent(test_info: dict, test_files: Optional[List[str]] = None) -> dict:
     """
-    Executes tests based on input from the tester agent.
-
-    Input (test_info):
-        execution_strategy: str (default: "pytest")
-
-    Output:
-        {
-            status: "pass" | "fail" | "no_tests" | "error",
-            passed_tests: List[str],
-            failed_tests: List[str],
-            logs: str,
-            summary_report: str,
-            execution_time_ms: int
-        }
+    Executes pytest tests and returns structured results
+    (Designed for self-healing test regeneration)
     """
 
-    command = test_info.get("execution_strategy", "pytest")
+    project_root = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..")
+    )
+
+    # 🔹 Build pytest command
+    if test_files:
+        test_targets = " ".join(test_files)
+        command = f"pytest {test_targets}"
+    else:
+        command = test_info.get("execution_strategy", "pytest")
 
     try:
-        # 🔹 Ensure pytest runs from PROJECT ROOT
-        project_root = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..")
-        )
-
         start_time = time.time()
 
         result = subprocess.run(
@@ -40,30 +32,27 @@ def executor_agent(test_info: dict) -> dict:
             text=True
         )
 
-        end_time = time.time()
-        execution_time_ms = int((end_time - start_time) * 1000)
-
+        execution_time_ms = int((time.time() - start_time) * 1000)
         stdout = result.stdout + result.stderr
 
-        # 🔹 Case 1: No tests found
+        # 🔹 No tests collected
         if "collected 0 items" in stdout:
             return {
                 "status": "no_tests",
                 "passed_tests": [],
                 "failed_tests": [],
                 "logs": stdout,
-                "summary_report": "No tests found to execute",
+                "summary_report": "No tests found",
                 "execution_time_ms": execution_time_ms
             }
 
-        # 🔹 Parse failed test names
-        failed_tests: List[str] = []
-
+        # 🔹 Extract failed tests
+        failed_tests = []
         for line in stdout.splitlines():
             if "FAILED" in line and "::" in line:
                 failed_tests.append(line.split("::")[-1].strip())
 
-        # 🔹 Case 2: All tests passed
+        # 🔹 All tests passed
         if result.returncode == 0:
             return {
                 "status": "pass",
@@ -74,11 +63,12 @@ def executor_agent(test_info: dict) -> dict:
                 "execution_time_ms": execution_time_ms
             }
 
-        # 🔹 Case 3: Tests failed
+        # 🔹 Tests failed (important for self-healing)
         return {
             "status": "fail",
             "passed_tests": [],
-            "failed_tests": failed_tests if failed_tests else ["unknown_test_failure"],
+            "failed_tests": failed_tests or ["unknown_failure"],
+            "failed_test_files": test_files,
             "logs": stdout,
             "summary_report": f"{len(failed_tests) or 1} test(s) failed",
             "execution_time_ms": execution_time_ms
@@ -88,18 +78,17 @@ def executor_agent(test_info: dict) -> dict:
         return {
             "status": "error",
             "passed_tests": [],
-            "failed_tests": ["execution_error"],
+            "failed_tests": ["executor_crash"],
             "logs": str(e),
             "summary_report": "Executor crashed",
             "execution_time_ms": 0
         }
 
 
-# 🔹 Manual test hook
+# 🔹 Manual test
 if __name__ == "__main__":
-    test_info = {
-        "execution_strategy": "pytest"
-    }
+    test_info = {"execution_strategy": "pytest"}
+    test_files = ["tests/test_payments_auto.py"]
 
-    output = executor_agent(test_info)
+    output = executor_agent(test_info, test_files)
     print(output)
