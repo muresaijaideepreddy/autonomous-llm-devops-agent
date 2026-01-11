@@ -27,9 +27,9 @@ from google import genai
 
 # Severity → max unit tests mapping
 MAX_TESTS_BY_SEVERITY = {
-    "low": 2,
-    "medium": 3,
-    "high": 5
+    "low": 12,
+    "medium": 15,
+    "high": 20
 }
 
 # Max retries if LLM generates invalid Python

@@ -51,13 +51,13 @@ def run_pipeline(repo_event: dict) -> dict:
     status = executor_output["status"]
 
     if status == "pass":
-        print("\n✅ CI PASSED")
+        print("\nCode is good to Go")
     elif status == "fail":
-        print("\n❌ CI FAILED")
+        print("\nError in Code Changes ")
     elif status == "no_tests":
-        print("\n⚠️ NO TESTS EXECUTED")
+        print("\nOops I could not generate test cases")
     else:
-        print("\n🚨 CI ERROR")
+        print("\nCI ERROR")
 
     # 🔹 5. SAVE METRICS
     os.makedirs("metrics", exist_ok=True)
