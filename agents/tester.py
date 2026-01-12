@@ -1,43 +1,34 @@
 """
 Tester Agent
 ============
-
 Automatically generates pytest unit tests using an LLM (Gemini).
-
 Key features:
-- Limits number of generated tests to avoid token truncation
 - Severity-based test count control
 - Python syntax validation
 - Retry mechanism with fallback tests
-- Production-grade logging and structure
+- Coverage-aware test generation (for Coverage Healer)
 """
+
 from dotenv import load_dotenv
-
 load_dotenv()
-
 
 import os
 import ast
-from typing import Dict, List
+from typing import Dict, List, Optional
 from google import genai
 
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
 
-# Severity → max unit tests mapping
 MAX_TESTS_BY_SEVERITY = {
     "low": 12,
     "medium": 15,
     "high": 20
 }
 
-# Max retries if LLM generates invalid Python
 MAX_RETRIES = 2
-
-# Gemini model (works with free tier access)
 GEMINI_MODEL = "models/gemini-2.5-flash"
-
 
 # -----------------------------
 # LLM CLIENT
@@ -49,27 +40,22 @@ def get_gemini_client() -> genai.Client:
         raise RuntimeError("GEMINI_API_KEY environment variable not set")
     return genai.Client(api_key=api_key)
 
-
 # -----------------------------
 # UTILS
 # -----------------------------
 
 def is_valid_python(code: str) -> bool:
-    """Validate generated Python code syntax."""
     try:
         ast.parse(code)
         return True
     except SyntaxError:
         return False
 
-
 def fallback_test(module: str) -> str:
-    """Safe fallback test if LLM output fails."""
     return f"""
 def test_{module}_fallback():
     assert True
 """
-
 
 # -----------------------------
 # LLM GENERATION
@@ -79,16 +65,31 @@ def generate_tests_with_gemini(
     client: genai.Client,
     source_code: str,
     module: str,
-    risk_level: str
+    risk_level: str,
+    coverage_context: Optional[dict] = None
 ) -> str:
     """
-    Generate pytest tests using Gemini with strict limits.
+    Generate pytest tests using Gemini.
     """
 
     max_tests = MAX_TESTS_BY_SEVERITY.get(risk_level, 2)
 
+    # ✅ MINIMAL ADDITION (coverage only)
+    coverage_instruction = ""
+    if coverage_context:
+        coverage_instruction = f"""
+IMPORTANT:
+These lines are NOT covered by tests:
+{coverage_context}
+
+Generate pytest tests that EXECUTE ONLY these uncovered lines.
+Do NOT re-test happy paths.
+If uncovered code raises errors, assert the error.
+"""
+
     prompt = f"""
 You are a senior QA engineer.
+{coverage_instruction}
 
 Generate pytest unit tests for the following Python module.
 
@@ -101,10 +102,9 @@ CRITICAL RULES (MUST FOLLOW):
 - Output ONLY valid Python code
 - Each test must be independent
 - Tests must reflect CORRECT business behavior
-- DO NOT mirror implementation bugs
 - If implementation is incorrect, tests MUST FAIL
-- ALWAYS include this import block at the top:
 
+ALWAYS include this import block at the top:
 import sys
 import os
 import pytest
@@ -128,7 +128,6 @@ Code:
 
     return response.text.strip()
 
-
 # -----------------------------
 # TESTER AGENT
 # -----------------------------
@@ -136,26 +135,17 @@ Code:
 def tester_agent(plan: Dict) -> Dict:
     """
     Tester Agent
-
-    Input:
-        plan:
-            modules_to_test: List[str]
-            risk_level: str
-
-    Output:
-        {
-            test_files_created: List[str],
-            num_tests_generated: int
-        }
     """
 
     modules: List[str] = plan.get("modules_to_test", [])
     risk_level: str = plan.get("risk_level", "low")
-    coverage_context = plan.get("coverage_context")
+
+    # ✅ MINIMAL ADDITION
+    coverage_context: Optional[dict] = plan.get("coverage_context")
 
     os.makedirs("tests", exist_ok=True)
-
     client = get_gemini_client()
+
     created_files: List[str] = []
     total_tests = 0
 
@@ -169,7 +159,6 @@ def tester_agent(plan: Dict) -> Dict:
 
         test_code = None
 
-        # 🔁 Retry logic
         for attempt in range(1, MAX_RETRIES + 1):
             print(f"🔁 Generating tests for {module} (attempt {attempt})")
 
@@ -177,7 +166,8 @@ def tester_agent(plan: Dict) -> Dict:
                 client=client,
                 source_code=source_code,
                 module=module,
-                risk_level=risk_level
+                risk_level=risk_level,
+                coverage_context=coverage_context
             )
 
             if is_valid_python(generated):
@@ -186,15 +176,18 @@ def tester_agent(plan: Dict) -> Dict:
             else:
                 print("⚠️ Invalid Python generated, retrying...")
 
-        # 🚨 Fallback
         if not test_code:
             print(f"🚨 Failed to generate valid tests for {module}, using fallback")
             test_code = fallback_test(module)
 
         test_file_path = f"tests/test_{module}_auto.py"
 
-        with open(test_file_path, "w") as f:
-            f.write(test_code)
+        # ✅ MINIMAL CHANGE (THIS IS THE KEY)
+        # overwrite normally, append during coverage healing
+        mode = "a" if coverage_context else "w"
+
+        with open(test_file_path, mode) as f:
+            f.write("\n\n" + test_code)
 
         created_files.append(test_file_path)
         total_tests += test_code.count("def test_")

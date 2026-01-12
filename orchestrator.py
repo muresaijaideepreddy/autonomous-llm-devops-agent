@@ -1,11 +1,18 @@
 from agents.planner import planner_agent
-from agents.tester2 import tester_agent
+from agents.tester import tester_agent
 from agents.executor import executor_agent
 from agents.failure_analysis import failure_analysis_agent
+from agents.healer import healing_hook
+
 from datetime import datetime, timezone
 import json
 import os
 import uuid
+
+# 🔹 CONFIG
+COVERAGE_THRESHOLD = 98
+ENABLE_COVERAGE_HEALING = True   # you control this manually
+
 
 def run_pipeline(repo_event: dict) -> dict:
     print("🔹 Starting Autonomous CI Pipeline")
@@ -23,12 +30,12 @@ def run_pipeline(repo_event: dict) -> dict:
         "end_time": None
     }
 
-    # 🔹 1. PLANNER AGENT
+    # 🔹 1. PLANNER
     print("\n🔹 Running Planner Agent...")
     planner_output = planner_agent(repo_event)
     pipeline_state["planner_output"] = planner_output
 
-    # 🔹 2. TESTER AGENT
+    # 🔹 2. TESTER
     print("\n🔹 Running Tester Agent...")
     tester_output = tester_agent(planner_output)
     pipeline_state["tester_output"] = tester_output
@@ -38,80 +45,86 @@ def run_pipeline(repo_event: dict) -> dict:
         "test_files": tester_output["test_files_created"]
     }
 
-    # 🔹 3. EXECUTOR AGENT
+    # 🔹 3. EXECUTOR
     print("\n🔹 Running Executor Agent...")
     executor_output = executor_agent(execution_input)
     pipeline_state["executor_output"] = executor_output
 
-    status = executor_output["status"]
-
+    status = executor_output.get("status")
     coverage = executor_output.get("coverage_percent")
 
-    if status == "pass" and coverage is not None and coverage < 98:
-        from agents.healer import healing_hook
-        executor_output = healing_hook(
-          planner_output=planner_output,
-        executor_output=executor_output
-        )
+    # 🔹 4. ONE‑SHOT COVERAGE HEALING (NO LOOPS)
+    if (
+        ENABLE_COVERAGE_HEALING
+        and status == "pass"
+        and coverage is not None
+        and coverage < COVERAGE_THRESHOLD
+    ):
+        print(f"\n🧠 One‑time Coverage Healing triggered (coverage={coverage:.2f}%)")
 
-        pipeline_state["executor_output"] = executor_output
+        try:
+            executor_output = healing_hook(
+                planner_output=planner_output,
+                executor_output=executor_output
+            )
+            pipeline_state["executor_output"] = executor_output
+        except Exception:
+            print("⚠️ Coverage healing skipped (LLM unavailable)")
 
+        # refresh values once
+        status = executor_output.get("status", status)
+        coverage = executor_output.get("coverage_percent", coverage)
 
-    # 🔹 4. FAILURE ANALYSIS (NEW & IMPORTANT)
+    # 🔹 5. FAILURE ANALYSIS (ONLY IF FAILS)
     if status in ("fail", "error"):
         print("\n🔍 Running Failure Analysis Agent...")
         failure_analysis = failure_analysis_agent(executor_output)
         pipeline_state["failure_analysis"] = failure_analysis
 
-        next_step = failure_analysis["next_step"]
+        next_step = failure_analysis.get("next_step")
 
-        if next_step == "healer":
-            print("🩺 Infra / Syntax issue → Send to Healer Agent")
-        elif next_step == "regenerate_tests":
-            print("🔁 Test bug detected → Regenerate tests using LLM")
+        if next_step == "regenerate_tests_for_coverage":
+            print("🧠 Coverage gap detected → rerun orchestrator manually")
         elif next_step == "suggest_code_fix":
-            print("🛠️ Code bug detected → Provide fix suggestions")
-        elif next_step == "manual_review":
-            print("👨‍💻 Manual review required → Unable to auto-classify failure")
+            print("🛠️ Code bug detected")
+        elif next_step == "regenerate_tests":
+            print("🔁 Test bug detected")
         else:
             print(f"⚠️ Unhandled pipeline action: {next_step}")
 
-
-    # 🔹 5. CI STATUS (FINAL MEANINGFUL STATUS)
+    # 🔹 6. FINAL STATUS
     if status == "pass":
-        print("\n✅ Code is good to go")
+        print("\n✅ Pipeline completed successfully")
+        if coverage is not None:
+            print(f"📊 Coverage after run : {coverage:.2f}%")
+
     elif status == "fail":
-        
         passed = executor_output.get("passed_tests", 0)
         failed = len(executor_output.get("failed_tests", []))
-        total = executor_output.get("total_tests", passed + failed)
-        coverage = executor_output.get("coverage_percent")
+
         print("\nTest Results Summary")
         print(f"Passed : {passed}")
         print(f"Failed : {failed}")
-        print("Failure analysis generated")
-        print(f"📊 Coverage : {coverage:.2f}%")
+        if coverage is not None:
+            print(f"📊 Coverage : {coverage:.2f}%")
 
-    elif status == "no_tests":
-        print("\nNo tests generated")
     else:
         print("\nCI Infrastructure Error")
 
-    # 🔹 6. SAVE METRICS
+    # 🔹 7. SAVE METRICS
     os.makedirs("metrics", exist_ok=True)
-
     metrics = {
         "run_id": run_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "status": status,
-        "failed_tests_count": len(executor_output.get("failed_tests", [])),
+        "coverage": coverage,
         "execution_time_ms": executor_output.get("execution_time_ms", 0)
     }
 
     with open("metrics/run_metrics.json", "a") as f:
         f.write(json.dumps(metrics) + "\n")
 
-    # 🔹 7. SAVE PIPELINE STATE
+    # 🔹 8. SAVE RUN STATE
     os.makedirs("runs", exist_ok=True)
     pipeline_state["end_time"] = datetime.now(timezone.utc).isoformat()
 
