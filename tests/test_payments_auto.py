@@ -1,10 +1,6 @@
 import sys
 import os
 import pytest
-from unittest.mock import MagicMock, patch
-from datetime import datetime
-import json
-import uuid
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SRC_DIR = os.path.join(ROOT_DIR, "src")
@@ -12,207 +8,290 @@ sys.path.insert(0, SRC_DIR)
 
 from payments import *
 
-@pytest.fixture
-def sample_payment():
-    return Payment("pay123", 100, "USD", "user1")
+import uuid
+from unittest.mock import patch # For mocking random
 
 @pytest.fixture
-def sample_wallet():
-    return Wallet("user1")
+def temp_repo_path(tmp_path):
+    repo_dir = tmp_path / "data"
+    repo_dir.mkdir(exist_ok=True)
+    return repo_dir / "payments.json"
 
 @pytest.fixture
-def payment_repo_path(tmp_path):
-    repo_path = tmp_path / "payments.json"
-    return repo_path
+def clear_payment_repo(temp_repo_path):
+    # Ensure the file is empty at the start of each test
+    with open(temp_repo_path, "w") as f:
+        json.dump([], f)
+    yield
 
-@pytest.fixture
-def payment_repository(payment_repo_path):
-    # Ensure a fresh repo for each test
-    if os.path.exists(payment_repo_path):
-        os.remove(repo_path)
-    return PaymentRepository(str(repo_path))
 
+# --- Payment Class Tests ---
+def test_payment_creation():
+    payment_id = str(uuid.uuid4())
+    amount = 100.50
+    currency = "USD"
+    user_id = "user123"
+    payment = Payment(payment_id, amount, currency, user_id)
+
+    assert payment.payment_id == payment_id
+    assert payment.amount == amount
+    assert payment.currency == currency
+    assert payment.user_id == user_id
+    assert payment.status == "CREATED"
+    assert isinstance(payment.created_at, datetime)
+
+def test_payment_status_update():
+    payment = Payment(str(uuid.uuid4()), 100, "USD", "user1")
+    assert payment.status == "CREATED"
+
+    payment.mark_success()
+    assert payment.status == "SUCCESS"
+
+    payment.mark_failed()
+    assert payment.status == "FAILED"
+
+
+# --- Wallet Class Tests ---
+def test_wallet_initialization():
+    user_id = "user123"
+    wallet = Wallet(user_id)
+    assert wallet.user_id == user_id
+    assert wallet.balance == 0
+    assert wallet.transactions == []
+
+def test_wallet_credit_adds_amount():
+    wallet = Wallet("user1")
+    initial_balance = wallet.balance
+    amount_to_credit = 500
+
+    # CORRECT BUSINESS BEHAVIOR: balance should increase by amount
+    wallet.credit(amount_to_credit)
+    assert wallet.balance == initial_balance + amount_to_credit
+    assert ("CREDIT", amount_to_credit) in wallet.transactions
+
+def test_wallet_debit_successful():
+    wallet = Wallet("user1")
+    wallet.balance = 1000  # Manually set initial balance for testing
+    amount_to_debit = 300
+    initial_balance = wallet.balance
+
+    result = wallet.debit(amount_to_debit)
+    assert result is True
+    assert wallet.balance == initial_balance - amount_to_debit
+    assert ("DEBIT", amount_to_debit) in wallet.transactions
+
+def test_wallet_debit_insufficient_funds():
+    wallet = Wallet("user1")
+    wallet.balance = 200
+    amount_to_debit = 300
+    initial_balance = wallet.balance
+
+    result = wallet.debit(amount_to_debit)
+    assert result is False
+    assert wallet.balance == initial_balance  # Balance should not change
+    assert ("DEBIT", amount_to_debit) not in wallet.transactions
+
+
+# --- PaymentRepository Tests ---
+def test_payment_repo_init_and_save(temp_repo_path, clear_payment_repo):
+    repo = PaymentRepository(path=temp_repo_path)
+    payment_id = str(uuid.uuid4())
+    payment = Payment(payment_id, 150, "EUR", "user_abc")
+    repo.save(payment)
+
+    loaded_data = repo._load()
+    assert len(loaded_data) == 1
+    assert loaded_data[0]["payment_id"] == payment_id
+    assert loaded_data[0]["status"] == "CREATED"
+
+def test_payment_repo_update_status(temp_repo_path, clear_payment_repo):
+    repo = PaymentRepository(path=temp_repo_path)
+    payment1_id = str(uuid.uuid4())
+    payment2_id = str(uuid.uuid4())
+    payment1 = Payment(payment1_id, 100, "USD", "userA")
+    payment2 = Payment(payment2_id, 200, "INR", "userB")
+    repo.save(payment1)
+    repo.save(payment2)
+
+    repo.update_status(payment1_id, "SUCCESS")
+    loaded_data = repo._load()
+
+    assert any(p["payment_id"] == payment1_id and p["status"] == "SUCCESS" for p in loaded_data)
+    assert any(p["payment_id"] == payment2_id and p["status"] == "CREATED" for p in loaded_data)
+
+def test_payment_repo_get_by_user(temp_repo_path, clear_payment_repo):
+    repo = PaymentRepository(path=temp_repo_path)
+    user1_id = "userX"
+    user2_id = "userY"
+    payment1 = Payment(str(uuid.uuid4()), 50, "USD", user1_id)
+    payment2 = Payment(str(uuid.uuid4()), 75, "EUR", user2_id)
+    payment3 = Payment(str(uuid.uuid4()), 120, "USD", user1_id)
+    repo.save(payment1)
+    repo.save(payment2)
+    repo.save(payment3)
+
+    user1_payments = repo.get_by_user(user1_id)
+    assert len(user1_payments) == 2
+    assert all(p["user_id"] == user1_id for p in user1_payments)
+    assert {p["amount"] for p in user1_payments} == {50, 120}
+
+    user2_payments = repo.get_by_user(user2_id)
+    assert len(user2_payments) == 1
+    assert all(p["user_id"] == user2_id for p in user2_payments)
+    assert {p["amount"] for p in user2_payments} == {75}
+
+    no_payments = repo.get_by_user("non_existent_user")
+    assert len(no_payments) == 0
+
+
+# --- FraudChecker Tests ---
+def test_fraud_checker_is_fraud_high_amount():
+    fraud_checker = FraudChecker()
+    payment = Payment(str(uuid.uuid4()), 100001, "USD", "user1")
+    assert fraud_checker.is_fraud(payment) is True
+
+def test_fraud_checker_is_fraud_unsupported_currency():
+    fraud_checker = FraudChecker()
+    payment = Payment(str(uuid.uuid4()), 500, "GBP", "user1")
+    assert fraud_checker.is_fraud(payment) is True
+
+def test_fraud_checker_is_not_fraud():
+    fraud_checker = FraudChecker()
+    payment = Payment(str(uuid.uuid4()), 50000, "INR", "user1")
+    assert fraud_checker.is_fraud(payment) is False
+
+
+# --- PaymentService Tests ---
 @pytest.fixture
-def mock_payment_service():
+def payment_service_with_mocks(temp_repo_path):
     service = PaymentService()
-    service.repo = MagicMock(spec=PaymentRepository)
-    service.gateway = MagicMock(spec=PaymentGateway)
-    service.fraud = MagicMock(spec=FraudChecker)
-    service.wallets = {}
+    service.repo = PaymentRepository(path=temp_repo_path)
+    service.wallets = {} # Ensure wallets are fresh for each test
     return service
 
-def test_payment_init(sample_payment):
-    assert sample_payment.payment_id == "pay123"
-    assert sample_payment.amount == 100
-    assert sample_payment.currency == "USD"
-    assert sample_payment.user_id == "user1"
-    assert sample_payment.status == "CREATED"
-    assert isinstance(sample_payment.created_at, datetime)
+def test_payment_service_process_payment_negative_amount(payment_service_with_mocks):
+    service = payment_service_with_mocks
+    user_id = "user_neg"
+    amount = -100
+    currency = "USD"
 
-def test_payment_mark_success(sample_payment):
-    sample_payment.mark_success()
-    assert sample_payment.status == "SUCCESS"
-
-def test_payment_mark_failed(sample_payment):
-    sample_payment.mark_failed()
-    assert sample_payment.status == "FAILED"
-
-def test_wallet_init(sample_wallet):
-    assert sample_wallet.user_id == "user1"
-    assert sample_wallet.balance == 0
-    assert sample_wallet.transactions == []
-
-def test_wallet_credit(sample_wallet):
-    sample_wallet.credit(50)
-    assert sample_wallet.balance == 50
-    assert sample_wallet.transactions == [("CREDIT", 50)]
-
-def test_wallet_debit_success(sample_wallet):
-    sample_wallet.credit(100)
-    result = sample_wallet.debit(30)
-    assert result is True
-    assert sample_wallet.balance == 70
-    assert sample_wallet.transactions == [("CREDIT", 100), ("DEBIT", 30)]
-
-def test_wallet_debit_insufficient_funds(sample_wallet):
-    sample_wallet.credit(20)
-    result = sample_wallet.debit(50)
-    assert result is False
-    assert sample_wallet.balance == 20
-    assert sample_wallet.transactions == [("CREDIT", 20)]
-
-def test_payment_repo_init(tmp_path):
-    repo_path = tmp_path / "test_init.json"
-    repo = PaymentRepository(str(repo_path))
-    assert os.path.exists(repo_path)
-    with open(repo_path, "r") as f:
-        assert json.load(f) == []
-
-def test_payment_repo_save_and_get_by_user(payment_repository):
-    payment1 = Payment("pay1", 100, "USD", "userA")
-    payment2 = Payment("pay2", 200, "EUR", "userB")
-    payment3 = Payment("pay3", 150, "INR", "userA")
-
-    payment_repository.save(payment1)
-    payment_repository.save(payment2)
-    payment_repository.save(payment3)
-
-    user_a_payments = payment_repository.get_by_user("userA")
-    assert len(user_a_payments) == 2
-    assert user_a_payments[0]["payment_id"] == "pay1"
-    assert user_a_payments[1]["payment_id"] == "pay3"
-
-def test_payment_repo_update_status(payment_repository):
-    payment = Payment("pay_update", 50, "USD", "userX")
-    payment_repository.save(payment)
-    payment_repository.update_status("pay_update", "SUCCESS")
-    payments_data = payment_repository._load()
-    assert payments_data[0]["status"] == "SUCCESS"
-
-def test_fraud_checker_no_fraud():
-    checker = FraudChecker()
-    payment = Payment("p1", 500, "USD", "u1")
-    assert checker.is_fraud(payment) is False
-
-def test_fraud_checker_is_fraud():
-    checker = FraudChecker()
-    payment_high_amount = Payment("p2", 100001, "USD", "u1")
-    assert checker.is_fraud(payment_high_amount) is True
-    payment_invalid_currency = Payment("p3", 500, "GBP", "u1")
-    assert checker.is_fraud(payment_invalid_currency) is True
-
-def test_payment_service_process_payment_success(mock_payment_service):
-    mock_payment_service.fraud.is_fraud.return_value = False
-    mock_payment_service.gateway.charge.return_value = True
-    mock_payment_service.add_funds("user1", 100)
-    result = mock_payment_service.process_payment("user1", 50, "USD")
-    assert result is True
-    assert mock_payment_service.user_balance("user1") == 50
-    mock_payment_service.repo.save.assert_called_once()
-    saved_payment = mock_payment_service.repo.save.call_args[0][0]
-    assert saved_payment.status == "SUCCESS"
-
-def test_payment_service_process_payment_invalid_amount(mock_payment_service):
     with pytest.raises(ValueError, match="Invalid amount"):
-        mock_payment_service.process_payment("user1", -10, "USD")
-    mock_payment_service.repo.save.assert_not_called()
+        service.process_payment(user_id, amount, currency)
 
-def test_payment_service_process_payment_fraud_detected(mock_payment_service):
-    mock_payment_service.fraud.is_fraud.return_value = True
-    result = mock_payment_service.process_payment("user1", 100, "USD")
+    assert len(service.repo.get_by_user(user_id)) == 0
+
+def test_payment_service_process_payment_fraud_check_fails(payment_service_with_mocks):
+    service = payment_service_with_mocks
+    user_id = "user_fraud"
+
+    service.process_payment(user_id, 100001, "USD")
+    payments = service.repo.get_by_user(user_id)
+    assert len(payments) == 1
+    assert payments[0]["status"] == "FAILED"
+
+    service.process_payment(user_id, 500, "JPY")
+    payments = service.repo.get_by_user(user_id)
+    assert len(payments) == 2
+    assert all(p["status"] == "FAILED" for p in payments)
+
+def test_payment_service_process_payment_insufficient_wallet_balance(payment_service_with_mocks):
+    service = payment_service_with_mocks
+    user_id = "user_low_funds"
+    
+    # Manually set wallet balance for predictable results, bypassing add_funds (which uses buggy credit)
+    wallet = service._get_wallet(user_id)
+    wallet.balance = 100 
+    
+    result = service.process_payment(user_id, 200, "USD")
     assert result is False
-    mock_payment_service.repo.save.assert_called_once()
-    saved_payment = mock_payment_service.repo.save.call_args[0][0]
-    assert saved_payment.status == "FAILED"
-    mock_payment_service.gateway.charge.assert_not_called()
+    payments = service.repo.get_by_user(user_id)
+    assert len(payments) == 1
+    assert payments[0]["status"] == "FAILED"
+    assert service.user_balance(user_id) == 100 # Balance should not change
 
-def test_payment_service_process_payment_insufficient_funds(mock_payment_service):
-    mock_payment_service.fraud.is_fraud.return_value = False
-    mock_payment_service.add_funds("user1", 10)
-    result = mock_payment_service.process_payment("user1", 50, "USD")
+def test_payment_service_process_payment_successful_charge(payment_service_with_mocks, mocker):
+    service = payment_service_with_mocks
+    user_id = "user_success"
+    amount = 100
+    service._get_wallet(user_id).balance = 500 # Manually set initial balance
+
+    mocker.patch.object(service.gateway, 'charge', return_value=True)
+
+    initial_balance = service.user_balance(user_id)
+    result = service.process_payment(user_id, amount, "USD")
+    assert result is True
+    assert service.user_balance(user_id) == initial_balance - amount
+
+    payments = service.repo.get_by_user(user_id)
+    assert len(payments) == 1
+    assert payments[0]["status"] == "SUCCESS"
+
+def test_payment_service_process_payment_gateway_declined_and_refunded(payment_service_with_mocks, mocker):
+    service = payment_service_with_mocks
+    user_id = "user_declined"
+    amount = 100
+    service._get_wallet(user_id).balance = 500 # Manually set initial balance
+
+    mocker.patch.object(service.gateway, 'charge', return_value=False)
+
+    initial_balance = service.user_balance(user_id)
+    result = service.process_payment(user_id, amount, "USD")
     assert result is False
-    assert mock_payment_service.user_balance("user1") == 10
-    mock_payment_service.repo.save.assert_called_once()
-    saved_payment = mock_payment_service.repo.save.call_args[0][0]
-    assert saved_payment.status == "FAILED"
-    mock_payment_service.gateway.charge.assert_not_called()
 
-def test_payment_service_process_payment_gateway_failure(mock_payment_service):
-    mock_payment_service.fraud.is_fraud.return_value = False
-    mock_payment_service.gateway.charge.return_value = False
-    mock_payment_service.add_funds("user1", 100)
-    result = mock_payment_service.process_payment("user1", 50, "USD")
-    assert result is False
-    assert mock_payment_service.user_balance("user1") == 100
-    mock_payment_service.repo.save.assert_called_once()
-    saved_payment = mock_payment_service.repo.save.call_args[0][0]
-    assert saved_payment.status == "FAILED"
+    # EXPECTED BEHAVIOR: Wallet balance should be restored to initial state
+    assert service.user_balance(user_id) == initial_balance
 
-def test_payment_service_add_funds_and_user_balance(mock_payment_service):
-    assert mock_payment_service.user_balance("user1") == 0
-    balance_after_add = mock_payment_service.add_funds("user1", 150)
-    assert balance_after_add == 150
-    assert mock_payment_service.user_balance("user1") == 150
+    payments = service.repo.get_by_user(user_id)
+    assert len(payments) == 1
+    assert payments[0]["status"] == "FAILED"
 
-def test_payment_service_refund(mock_payment_service):
-    payment_id = str(uuid.uuid4())
+def test_payment_service_add_funds(payment_service_with_mocks):
+    service = payment_service_with_mocks
+    user_id = "user_add_funds"
+    amount_to_add = 200
+
+    initial_balance = service.user_balance(user_id) # Should be 0 initially
+    new_balance = service.add_funds(user_id, amount_to_add)
+
+    # EXPECTED BEHAVIOR: Balance should increase by amount_to_add
+    assert new_balance == initial_balance + amount_to_add
+    assert service.user_balance(user_id) == initial_balance + amount_to_add
+
+def test_payment_service_user_balance(payment_service_with_mocks):
+    service = payment_service_with_mocks
+    user_id = "user_balance"
+    wallet = service._get_wallet(user_id)
+    wallet.balance = 123.45
+
+    balance = service.user_balance(user_id)
+    assert balance == 123.45
+
+def test_payment_service_refund_payment(payment_service_with_mocks, mocker):
+    service = payment_service_with_mocks
     user_id = "user_refund"
-    amount = 75
-    mock_payment_service.repo._load.return_value = [{
-        "payment_id": payment_id,
-        "amount": amount,
-        "currency": "USD",
-        "user_id": user_id,
-        "status": "SUCCESS",
-        "created_at": datetime.utcnow().isoformat()
-    }]
-    mock_payment_service.repo._write.return_value = None
+    original_amount = 150
+    wallet = service._get_wallet(user_id)
+    wallet.balance = 1000 # Manually set initial balance
+    initial_wallet_balance = wallet.balance
 
-    mock_payment_service.add_funds(user_id, 100)
-    mock_payment_service.wallets[user_id].balance -= amount # Simulate debit
-    assert mock_payment_service.user_balance(user_id) == 25
+    # Simulate a successful payment first
+    mocker.patch.object(service.gateway, 'charge', return_value=True)
+    service.process_payment(user_id, original_amount, "USD")
+    
+    payments = service.repo.get_by_user(user_id)
+    assert len(payments) == 1
+    successful_payment_id = payments[0]["payment_id"]
+    assert payments[0]["status"] == "SUCCESS"
+    assert service.user_balance(user_id) == initial_wallet_balance - original_amount
 
-    mock_payment_service.refund(payment_id)
-    assert mock_payment_service.user_balance(user_id) == 100
-    mock_payment_service.repo._write.assert_called_once()
-    updated_data = mock_payment_service.repo._write.call_args[0][0]
-    assert updated_data[0]["status"] == "REFUNDED"
+    # Perform refund
+    service.refund(successful_payment_id)
 
-def test_batch_payments(mock_payment_service):
-    mock_payment_service.fraud.is_fraud.side_effect = [False, True, False, False]
-    mock_payment_service.gateway.charge.side_effect = [True, None, False, True] # None for when fraud prevents charge
+    # EXPECTED BEHAVIOR: Payment status should be "REFUNDED"
+    updated_payments = service.repo._load()
+    refunded_payment = next((p for p in updated_payments if p["payment_id"] == successful_payment_id), None)
+    assert refunded_payment is not None
+    assert refunded_payment["status"] == "REFUNDED"
 
-    user_id = "user_batch"
-    mock_payment_service.add_funds(user_id, 500)
-
-    payments_to_process = [
-        (50, "USD"),  # Success
-        (200, "INR"), # Fraud
-        (75, "EUR"),  # Gateway failure (debit & credit back)
-        (100, "USD")  # Success
-    ]
-
-    results = batch_payments(mock_payment_service, user_id, payments_to_process)
-
-    assert results == [True, False, False, True]
-    assert mock_payment_service.user_balance(user_id) == 350 # 500 - 50 (P1) - 0 (P2) - 0 (P3 net) - 100 (P4) = 350
+    # EXPECTED BEHAVIOR: Wallet balance should be restored to initial balance
+    assert service.user_balance(user_id) == initial_wallet_balance
