@@ -1,5 +1,5 @@
 from agents.planner import planner_agent
-from agents.tester import tester_agent
+from agents.tester2 import tester_agent
 from agents.executor import executor_agent
 from agents.failure_analysis import failure_analysis_agent
 from datetime import datetime, timezone
@@ -48,17 +48,13 @@ def run_pipeline(repo_event: dict) -> dict:
     coverage = executor_output.get("coverage_percent")
 
     if status == "pass" and coverage is not None and coverage < 98:
-        print("\n🔹 Coverage below threshold")
-        print(f"Coverage : {coverage}%")
-        print("Next step : Generate tests for uncovered lines")
+        from agents.healer import healing_hook
+        executor_output = healing_hook(
+          planner_output=planner_output,
+        executor_output=executor_output
+        )
 
-        pipeline_state["failure_analysis"] = {
-            "failure_type": "coverage_gap",
-            "next_step": "coverage_healer",
-            "coverage": coverage,
-            "uncovered_files": executor_output.get("uncovered_files")
-       }
-        status = "fail"
+        pipeline_state["executor_output"] = executor_output
 
 
     # 🔹 4. FAILURE ANALYSIS (NEW & IMPORTANT)

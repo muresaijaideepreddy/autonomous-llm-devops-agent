@@ -151,6 +151,7 @@ def tester_agent(plan: Dict) -> Dict:
 
     modules: List[str] = plan.get("modules_to_test", [])
     risk_level: str = plan.get("risk_level", "low")
+    coverage_context = plan.get("coverage_context")
 
     os.makedirs("tests", exist_ok=True)
 

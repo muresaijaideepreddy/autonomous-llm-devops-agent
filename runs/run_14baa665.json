@@ -1,0 +1,72 @@
+{
+  "run_id": "run_14baa665",
+  "planner_output": {
+    "modules_to_test": [
+      "payments"
+    ],
+    "test_types": [
+      "unit",
+      "edge"
+    ],
+    "risk_level": "high",
+    "reason": "high severity issue affecting ['payments']"
+  },
+  "tester_output": {
+    "test_files_created": [
+      "tests/test_payments_auto.py"
+    ],
+    "num_tests_generated": 20
+  },
+  "executor_output": {
+    "status": "pass",
+    "total_tests": 20,
+    "passed_tests": 20,
+    "failed_tests": [],
+    "coverage_percent": 78.57142857142857,
+    "uncovered_files": {
+      "src/payments.py": [
+        148,
+        149,
+        150,
+        151,
+        152,
+        153,
+        154,
+        162,
+        163,
+        164,
+        165,
+        166,
+        167,
+        168,
+        169,
+        173,
+        174,
+        175,
+        177,
+        178,
+        179,
+        180,
+        181,
+        182,
+        183,
+        184,
+        185,
+        200,
+        201,
+        203,
+        204,
+        205,
+        207
+      ]
+    },
+    "logs": "============================= test session starts ==============================\nplatform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0\nrootdir: /home/brahmanya/autonomous-llm-devops-agent\nplugins: metadata-3.1.1, anyio-4.11.0, mock-3.15.1, json-report-1.5.0, langsmith-0.4.41, cov-7.0.0\ncollected 20 items\n\ntests/test_payments_auto.py ....................                         [100%]\n\n=============================== warnings summary ===============================\ntests/test_payments_auto.py: 20 warnings\n  /home/brahmanya/autonomous-llm-devops-agent/src/payments.py:13: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).\n    self.created_at = datetime.utcnow()\n\ntests/test_payments_auto.py::test_payment_repo_update_status\ntests/test_payments_auto.py::test_payment_repo_get_by_user\n  /home/brahmanya/autonomous-llm-devops-agent/tests/test_payments_auto.py:31: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).\n    {\"payment_id\": \"p1\", \"amount\": 100.0, \"currency\": \"USD\", \"user_id\": \"u1\", \"status\": \"SUCCESS\", \"created_at\": datetime.utcnow().isoformat()},\n\ntests/test_payments_auto.py::test_payment_repo_update_status\ntests/test_payments_auto.py::test_payment_repo_get_by_user\n  /home/brahmanya/autonomous-llm-devops-agent/tests/test_payments_auto.py:32: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).\n    {\"payment_id\": \"p2\", \"amount\": 200.0, \"currency\": \"EUR\", \"user_id\": \"u2\", \"status\": \"FAILED\", \"created_at\": datetime.utcnow().isoformat()},\n\ntests/test_payments_auto.py::test_payment_repo_update_status\ntests/test_payments_auto.py::test_payment_repo_get_by_user\n  /home/brahmanya/autonomous-llm-devops-agent/tests/test_payments_auto.py:33: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).\n    {\"payment_id\": \"p3\", \"amount\": 150.0, \"currency\": \"USD\", \"user_id\": \"u1\", \"status\": \"CREATED\", \"created_at\": datetime.utcnow().isoformat()}\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n======================= 20 passed, 26 warnings in 0.05s ========================\n",
+    "summary_report": "\u2705 All tests passed (20/20)",
+    "execution_time_ms": 546,
+    "healed": true,
+    "coverage_gap_fixed": true
+  },
+  "failure_analysis": null,
+  "start_time": "2026-01-12T06:42:33.920171+00:00",
+  "end_time": "2026-01-12T06:44:24.664960+00:00"
+}
