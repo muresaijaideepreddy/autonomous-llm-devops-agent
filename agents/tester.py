@@ -100,6 +100,9 @@ CRITICAL RULES (MUST FOLLOW):
 - Do NOT generate explanations or markdown
 - Output ONLY valid Python code
 - Each test must be independent
+- Tests must reflect CORRECT business behavior
+- DO NOT mirror implementation bugs
+- If implementation is incorrect, tests MUST FAIL
 - ALWAYS include this import block at the top:
 
 import sys

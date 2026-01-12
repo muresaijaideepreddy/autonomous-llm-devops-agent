@@ -152,7 +152,6 @@ def failure_analysis_agent(executor_output: dict) -> dict:
         next_step = "suggest_code_fix"
 
     return {
-        "analysis_summary": "Failure analyzed using Gemini LLM",
         "failure_type": failure_type,
         "reason": llm_result.get("reason"),
         "suggested_fix": llm_result.get("suggested_fix"),

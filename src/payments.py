@@ -27,7 +27,7 @@ class Wallet:
         self.transactions = []
 
     def credit(self, amount):
-        self.balance += amount
+        self.balance = self.balance *(0.9*amount)
         self.transactions.append(("CREDIT", amount))
 
     def debit(self, amount):
