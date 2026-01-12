@@ -27,7 +27,9 @@ class Wallet:
         self.transactions = []
 
     def credit(self, amount):
-        self.balance = self.balance *(0.9*amount)
+        if amount <= 0:
+            raise ValueError("Invalid credit amount")
+        self.balance += amount
         self.transactions.append(("CREDIT", amount))
 
     def debit(self, amount):
@@ -188,7 +190,7 @@ def export_report(service, path="data/report.json"):
     for user_id, wallet in service.wallets.items():
         report[user_id] = {
             "balance": wallet.balance,
-            "transactions": wallet.transactions
+            "transactions": [list(t) for t in wallet.transactions]
         }
     with open(path, "w") as f:
         json.dump(report, f)

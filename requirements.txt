@@ -14,3 +14,6 @@ python-dotenv>=1.0
 
 streamlit
 
+pytest-cov
+
+pytest-mock

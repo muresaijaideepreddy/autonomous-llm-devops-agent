@@ -1,3 +1,4 @@
+import json
 import subprocess
 import os
 import time
@@ -9,7 +10,12 @@ def executor_agent(test_info: dict, test_files: Optional[List[str]] = None) -> d
         os.path.join(os.path.dirname(__file__), "..")
     )
 
-    command = ["pytest", *test_files] if test_files else \
+    command = ["pytest", 
+               "--cov=src",
+               "--cov-report=term-missing",
+               "--cov-report=json",
+               *test_files
+              ] if test_files else \
               test_info.get("execution_strategy", "pytest").split()
 
     try:
@@ -24,6 +30,21 @@ def executor_agent(test_info: dict, test_files: Optional[List[str]] = None) -> d
 
         execution_time_ms = int((time.time() - start_time) * 1000)
         logs = result.stdout + result.stderr
+
+        coverage_percent = None
+        uncovered_files = {}
+
+        if os.path.exists("coverage.json"):
+            with open("coverage.json") as f:
+                coverage_data = json.load(f)
+
+            coverage_percent = coverage_data["totals"]["percent_covered"]
+
+            for file, data in coverage_data["files"].items():
+                missing = data.get("missing_lines", [])
+                if missing:
+                    uncovered_files[file] = missing
+
         fatal_errors = (
             "SyntaxError",
             "IndentationError",
@@ -38,6 +59,9 @@ def executor_agent(test_info: dict, test_files: Optional[List[str]] = None) -> d
                 "failed_tests": [],
                 "passed_tests": [],
                 "total_tests": 0,
+                
+                "coverage_percent": coverage_percent,
+                "uncovered_files": uncovered_files,
                 "logs": logs,
                 "summary_report": "CI failed due to syntax/import error",
                 "execution_time_ms": execution_time_ms
@@ -48,6 +72,9 @@ def executor_agent(test_info: dict, test_files: Optional[List[str]] = None) -> d
                 "failed_tests": [],
                 "passed_tests": [],
                 "total_tests": 0,
+                
+                "coverage_percent": coverage_percent,
+                "uncovered_files": uncovered_files,
                 "logs": logs,
                 "summary_report": "No tests were collected",
                 "execution_time_ms": execution_time_ms
@@ -81,6 +108,9 @@ def executor_agent(test_info: dict, test_files: Optional[List[str]] = None) -> d
                 "total_tests": total_tests,
                 "passed_tests": passed_count,
                 "failed_tests": [],
+                
+                "coverage_percent": coverage_percent,
+                "uncovered_files": uncovered_files,
                 "logs": logs,
                 "summary_report": (
                     f"✅ All tests passed ({passed_count}/{total_tests})"
@@ -93,6 +123,8 @@ def executor_agent(test_info: dict, test_files: Optional[List[str]] = None) -> d
             "passed_tests": passed_count,
             "failed_tests": failed_tests,
             "failed_test_files": list(failed_files),
+            "coverage_percent": coverage_percent,
+            "uncovered_files": uncovered_files,
             "logs": logs,
             "summary_report": (
                 f"❌ {failed_count} failed, {passed_count} passed "

@@ -2,7 +2,7 @@ from agents.planner import planner_agent
 from agents.tester import tester_agent
 from agents.executor import executor_agent
 from agents.failure_analysis import failure_analysis_agent
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import os
 import uuid
@@ -11,7 +11,7 @@ def run_pipeline(repo_event: dict) -> dict:
     print("🔹 Starting Autonomous CI Pipeline")
 
     run_id = f"run_{uuid.uuid4().hex[:8]}"
-    start_time = datetime.utcnow()
+    start_time = datetime.now(timezone.utc)
 
     pipeline_state = {
         "run_id": run_id,
@@ -45,6 +45,22 @@ def run_pipeline(repo_event: dict) -> dict:
 
     status = executor_output["status"]
 
+    coverage = executor_output.get("coverage_percent")
+
+    if status == "pass" and coverage is not None and coverage < 98:
+        print("\n🔹 Coverage below threshold")
+        print(f"Coverage : {coverage}%")
+        print("Next step : Generate tests for uncovered lines")
+
+        pipeline_state["failure_analysis"] = {
+            "failure_type": "coverage_gap",
+            "next_step": "coverage_healer",
+            "coverage": coverage,
+            "uncovered_files": executor_output.get("uncovered_files")
+       }
+        status = "fail"
+
+
     # 🔹 4. FAILURE ANALYSIS (NEW & IMPORTANT)
     if status in ("fail", "error"):
         print("\n🔍 Running Failure Analysis Agent...")
@@ -59,8 +75,11 @@ def run_pipeline(repo_event: dict) -> dict:
             print("🔁 Test bug detected → Regenerate tests using LLM")
         elif next_step == "suggest_code_fix":
             print("🛠️ Code bug detected → Provide fix suggestions")
+        elif next_step == "manual_review":
+            print("👨‍💻 Manual review required → Unable to auto-classify failure")
         else:
-            print("❓ Unknown failure path")
+            print(f"⚠️ Unhandled pipeline action: {next_step}")
+
 
     # 🔹 5. CI STATUS (FINAL MEANINGFUL STATUS)
     if status == "pass":
@@ -70,11 +89,12 @@ def run_pipeline(repo_event: dict) -> dict:
         passed = executor_output.get("passed_tests", 0)
         failed = len(executor_output.get("failed_tests", []))
         total = executor_output.get("total_tests", passed + failed)
-
+        coverage = executor_output.get("coverage_percent")
         print("\nTest Results Summary")
         print(f"Passed : {passed}")
         print(f"Failed : {failed}")
         print("Failure analysis generated")
+        print(f"📊 Coverage : {coverage:.2f}%")
 
     elif status == "no_tests":
         print("\nNo tests generated")
@@ -86,7 +106,7 @@ def run_pipeline(repo_event: dict) -> dict:
 
     metrics = {
         "run_id": run_id,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "status": status,
         "failed_tests_count": len(executor_output.get("failed_tests", [])),
         "execution_time_ms": executor_output.get("execution_time_ms", 0)
@@ -97,7 +117,7 @@ def run_pipeline(repo_event: dict) -> dict:
 
     # 🔹 7. SAVE PIPELINE STATE
     os.makedirs("runs", exist_ok=True)
-    pipeline_state["end_time"] = datetime.utcnow().isoformat()
+    pipeline_state["end_time"] = datetime.now(timezone.utc).isoformat()
 
     with open(f"runs/{run_id}.json", "w") as f:
         json.dump(pipeline_state, f, indent=2)

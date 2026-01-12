@@ -1,0 +1,70 @@
+{
+  "run_id": "run_e8d3873a",
+  "planner_output": {
+    "modules_to_test": [
+      "payments"
+    ],
+    "test_types": [
+      "unit",
+      "edge"
+    ],
+    "risk_level": "high",
+    "reason": "high severity issue affecting ['payments']"
+  },
+  "tester_output": {
+    "test_files_created": [
+      "tests/test_payments_auto.py"
+    ],
+    "num_tests_generated": 21
+  },
+  "executor_output": {
+    "status": "fail",
+    "total_tests": 21,
+    "passed_tests": 20,
+    "failed_tests": [
+      "test_payment_service_process_payment_gateway_failure_refunds_wallet_and_updates_repo"
+    ],
+    "failed_test_files": [
+      "FAILED tests/test_payments_auto.py"
+    ],
+    "coverage_percent": 86.36363636363636,
+    "uncovered_files": {
+      "src/payments.py": [
+        31,
+        167,
+        168,
+        173,
+        174,
+        175,
+        177,
+        178,
+        179,
+        180,
+        181,
+        182,
+        183,
+        184,
+        185,
+        200,
+        201,
+        203,
+        204,
+        205,
+        207
+      ]
+    },
+    "logs": "============================= test session starts ==============================\nplatform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0\nrootdir: /home/brahmanya/autonomous-llm-devops-agent\nplugins: metadata-3.1.1, anyio-4.11.0, mock-3.15.1, json-report-1.5.0, langsmith-0.4.41, cov-7.0.0\ncollected 21 items\n\ntests/test_payments_auto.py ...................F.                        [100%]\n\n=================================== FAILURES ===================================\n_ test_payment_service_process_payment_gateway_failure_refunds_wallet_and_updates_repo _\n\nmocker = <pytest_mock.plugin.MockerFixture object at 0x73c47208b350>\nmock_payment_service = <payments.PaymentService object at 0x73c47208acc0>\n\n    def test_payment_service_process_payment_gateway_failure_refunds_wallet_and_updates_repo(mocker, mock_payment_service):\n        user_id = \"test_user_gateway_fail\"\n        amount = 100\n        mock_payment_service.add_funds(user_id, 200)\n        mock_payment_service.fraud.is_fraud.return_value = False\n        mock_payment_service.gateway.charge.return_value = False\n>       mocker.patch('uuid.uuid4', return_value=uuid.UUID('aaaaaaa-bbbb-cccc-dddd-eeeeffff0000'))\n                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\ntests/test_payments_auto.py:197: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nself = <[AttributeError(\"'UUID' object has no attribute 'int'\") raised in repr()] UUID object at 0x73c471e53510>\nhex = 'aaaaaaabbbbccccddddeeeeffff0000', bytes = None, bytes_le = None\nfields = None, int = None, version = None\n\n    def __init__(self, hex=None, bytes=None, bytes_le=None, fields=None,\n                       int=None, version=None,\n                       *, is_safe=SafeUUID.unknown):\n        r\"\"\"Create a UUID from either a string of 32 hexadecimal digits,\n        a string of 16 bytes as the 'bytes' argument, a string of 16 bytes\n        in little-endian order as the 'bytes_le' argument, a tuple of six\n        integers (32-bit time_low, 16-bit time_mid, 16-bit time_hi_version,\n        8-bit clock_seq_hi_variant, 8-bit clock_seq_low, 48-bit node) as\n        the 'fields' argument, or a single 128-bit integer as the 'int'\n        argument.  When a string of hex digits is given, curly braces,\n        hyphens, and a URN prefix are all optional.  For example, these\n        expressions all yield the same UUID:\n    \n        UUID('{12345678-1234-5678-1234-567812345678}')\n        UUID('12345678123456781234567812345678')\n        UUID('urn:uuid:12345678-1234-5678-1234-567812345678')\n        UUID(bytes='\\x12\\x34\\x56\\x78'*4)\n        UUID(bytes_le='\\x78\\x56\\x34\\x12\\x34\\x12\\x78\\x56' +\n                      '\\x12\\x34\\x56\\x78\\x12\\x34\\x56\\x78')\n        UUID(fields=(0x12345678, 0x1234, 0x5678, 0x12, 0x34, 0x567812345678))\n        UUID(int=0x12345678123456781234567812345678)\n    \n        Exactly one of 'hex', 'bytes', 'bytes_le', 'fields', or 'int' must\n        be given.  The 'version' argument is optional; if given, the resulting\n        UUID will have its variant and version set according to RFC 4122,\n        overriding the given 'hex', 'bytes', 'bytes_le', 'fields', or 'int'.\n    \n        is_safe is an enum exposed as an attribute on the instance.  It\n        indicates whether the UUID has been generated in a way that is safe\n        for multiprocessing applications, via uuid_generate_time_safe(3).\n        \"\"\"\n    \n        if [hex, bytes, bytes_le, fields, int].count(None) != 4:\n            raise TypeError('one of the hex, bytes, bytes_le, fields, '\n                            'or int arguments must be given')\n        if hex is not None:\n            hex = hex.replace('urn:', '').replace('uuid:', '')\n            hex = hex.strip('{}').replace('-', '')\n            if len(hex) != 32:\n>               raise ValueError('badly formed hexadecimal UUID string')\nE               ValueError: badly formed hexadecimal UUID string\n\n/usr/lib/python3.12/uuid.py:178: ValueError\n=============================== warnings summary ===============================\ntests/test_payments_auto.py: 15 warnings\n  /home/brahmanya/autonomous-llm-devops-agent/src/payments.py:13: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).\n    self.created_at = datetime.utcnow()\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ============================\nFAILED tests/test_payments_auto.py::test_payment_service_process_payment_gateway_failure_refunds_wallet_and_updates_repo\n================== 1 failed, 20 passed, 15 warnings in 0.12s ===================\n",
+    "summary_report": "\u274c 1 failed, 20 passed (Total: 21)",
+    "execution_time_ms": 948
+  },
+  "failure_analysis": {
+    "failure_type": "coverage_gap",
+    "reason": "Coverage below threshold (86.36363636363636%)",
+    "next_step": "regenerate_tests_for_coverage",
+    "confidence": "high",
+    "coverage_percent": 86.36363636363636,
+    "uncovered_lines": []
+  },
+  "start_time": "2026-01-12T05:53:37.728957",
+  "end_time": "2026-01-12T05:54:27.052923"
+}
