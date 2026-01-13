@@ -45,64 +45,85 @@ def run_pipeline(repo_event: dict) -> dict:
     pipeline_state["planner_output"] = planner_output
 
     # ─────────────────────────────────────────
-    # 2️⃣ TESTER (FREEZE TESTS ONCE THEY EXIST)
+    # 2️⃣ COLLECT CURRENT TESTS (IF ANY)
     # ─────────────────────────────────────────
-    print("\n🔹 Running Tester Agent...")
-
     os.makedirs(TEST_DIR, exist_ok=True)
-    existing_tests = [
+    test_files = [
         os.path.join(TEST_DIR, f)
         for f in os.listdir(TEST_DIR)
         if f.startswith("test_") and f.endswith(".py")
     ]
 
-    if existing_tests:
-        print("🔒 Reusing existing tests (coverage already converged)")
-        tester_output = {
-            "test_files_created": existing_tests,
-            "num_tests_generated": 0
-        }
+    # ─────────────────────────────────────────
+    # 3️⃣ EXECUTOR (RUN EXISTING TESTS FIRST)
+    # ─────────────────────────────────────────
+    executor_output = None
+    coverage = None
+    status = None
+
+    if test_files:
+        print("\n🔹 Running Executor Agent (existing tests)...")
+        executor_output = executor_agent({
+            "execution_strategy": "pytest",
+            "test_files": test_files
+        })
+        pipeline_state["executor_output"] = executor_output
+        status = executor_output.get("status")
+        coverage = executor_output.get("coverage_percent")
+
+        if coverage is not None:
+            print(f"📊 Current Coverage: {coverage:.2f}%")
     else:
+        print("\nℹ️ No tests found yet")
+
+    # ─────────────────────────────────────────
+    # 4️⃣ DECISION: SHOULD AGENTS RUN?
+    # ─────────────────────────────────────────
+    if coverage is None or coverage < COVERAGE_THRESHOLD:
+        print("\n🧪 Coverage below threshold → activating agents")
+
+        # 4a️⃣ TESTER
+        print("\n🔹 Running Tester Agent...")
         tester_output = tester_agent(planner_output)
+        pipeline_state["tester_output"] = tester_output
 
-    pipeline_state["tester_output"] = tester_output
+        # 4b️⃣ EXECUTOR AGAIN (WITH NEW TESTS)
+        print("\n🔹 Re-running Executor Agent...")
+        executor_output = executor_agent({
+            "execution_strategy": "pytest",
+            "test_files": tester_output["test_files_created"]
+        })
+        pipeline_state["executor_output"] = executor_output
 
-    # ─────────────────────────────────────────
-    # 3️⃣ EXECUTOR
-    # ─────────────────────────────────────────
-    print("\n🔹 Running Executor Agent...")
-    executor_output = executor_agent({
-        "execution_strategy": "pytest",
-        "test_files": tester_output["test_files_created"]
-    })
-    pipeline_state["executor_output"] = executor_output
+        status = executor_output.get("status")
+        coverage = executor_output.get("coverage_percent")
 
-    status = executor_output.get("status")
-    coverage = executor_output.get("coverage_percent")
+        if coverage is not None:
+            print(f"📊 Coverage after tester: {coverage:.2f}%")
 
-    # ─────────────────────────────────────────
-    # 4️⃣ ONE‑SHOT COVERAGE HEALING (ONLY ONCE)
-    # ─────────────────────────────────────────
-    if (
-        ENABLE_COVERAGE_HEALING
-        and status == "pass"
-        and coverage is not None
-        and coverage < COVERAGE_THRESHOLD
-    ):
-        print(f"\n🧠 Coverage Healing triggered ({coverage:.2f}%)")
+        # 4 c️⃣  COVERAGE HEALER (ONLY IF TESTS PASS)
+        if (
+            ENABLE_COVERAGE_HEALING
+            and status == "pass"
+            and coverage is not None
+            and coverage < COVERAGE_THRESHOLD
+        ):
+            print(f"\n🧠 Coverage Healing triggered ({coverage:.2f}%)")
 
-        try:
             executor_output = healing_hook(
                 planner_output=planner_output,
                 executor_output=executor_output
             )
             pipeline_state["executor_output"] = executor_output
 
-            status = executor_output.get("status", status)
-            coverage = executor_output.get("coverage_percent", coverage)
+            status = executor_output.get("status")
+            coverage = executor_output.get("coverage_percent")
 
-        except Exception as e:
-            print("⚠️ Coverage healing skipped:", e)
+            if coverage is not None:
+                print(f"📈 Coverage after healing: {coverage:.2f}%")
+
+    else:
+        print("\n🔒 Coverage ≥ threshold → agents idle")
 
     # ─────────────────────────────────────────
     # 5️⃣ FAILURE ANALYSIS
@@ -112,18 +133,8 @@ def run_pipeline(repo_event: dict) -> dict:
         failure_analysis = failure_analysis_agent(executor_output)
         pipeline_state["failure_analysis"] = failure_analysis
 
-        next_step = failure_analysis.get("next_step")
-
-        if next_step == "suggest_code_fix":
-            print("🛠️ Code bug detected")
-        elif next_step == "regenerate_tests":
-            print("🔁 Test bug detected")
-        elif next_step == "regenerate_tests_for_coverage":
-            print("📉 Coverage gap detected")
-        elif next_step == "manual_review":
-            print("👨‍💻 Manual review required")
-        else:
-            print(f"⚠️ Unhandled pipeline action: {next_step}")
+        print(f"🛠️ Failure type: {failure_analysis.get('failure_type')}")
+        print(f"➡️ Next step: {failure_analysis.get('next_step')}")
 
     # ─────────────────────────────────────────
     # 6️⃣ FINAL STATUS
@@ -144,20 +155,17 @@ def run_pipeline(repo_event: dict) -> dict:
         if coverage is not None:
             print(f"📊 Coverage : {coverage:.2f}%")
 
-    else:
-        print("\n🚨 CI Infrastructure Error")
-
     # ─────────────────────────────────────────
     # 7️⃣ SAVE METRICS
     # ─────────────────────────────────────────
     os.makedirs("metrics", exist_ok=True)
-
     metrics = {
         "run_id": run_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "status": status,
         "coverage": coverage,
         "execution_time_ms": executor_output.get("execution_time_ms", 0)
+        if executor_output else 0
     }
 
     with open("metrics/run_metrics.json", "a") as f:
