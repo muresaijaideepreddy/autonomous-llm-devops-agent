@@ -9,10 +9,17 @@ import json
 import os
 import uuid
 
-# 🔹 CONFIG
-COVERAGE_THRESHOLD = 98
-ENABLE_COVERAGE_HEALING = True   # you control this manually
+# ─────────────────────────────────────────────
+# CONFIG
+# ─────────────────────────────────────────────
 
+COVERAGE_THRESHOLD = 98
+ENABLE_COVERAGE_HEALING = True
+TEST_DIR = "tests"
+
+# ─────────────────────────────────────────────
+# ORCHESTRATOR
+# ─────────────────────────────────────────────
 
 def run_pipeline(repo_event: dict) -> dict:
     print("🔹 Starting Autonomous CI Pipeline")
@@ -30,37 +37,59 @@ def run_pipeline(repo_event: dict) -> dict:
         "end_time": None
     }
 
-    # 🔹 1. PLANNER
+    # ─────────────────────────────────────────
+    # 1️⃣ PLANNER
+    # ─────────────────────────────────────────
     print("\n🔹 Running Planner Agent...")
     planner_output = planner_agent(repo_event)
     pipeline_state["planner_output"] = planner_output
 
-    # 🔹 2. TESTER
+    # ─────────────────────────────────────────
+    # 2️⃣ TESTER (FREEZE TESTS ONCE THEY EXIST)
+    # ─────────────────────────────────────────
     print("\n🔹 Running Tester Agent...")
-    tester_output = tester_agent(planner_output)
+
+    os.makedirs(TEST_DIR, exist_ok=True)
+    existing_tests = [
+        os.path.join(TEST_DIR, f)
+        for f in os.listdir(TEST_DIR)
+        if f.startswith("test_") and f.endswith(".py")
+    ]
+
+    if existing_tests:
+        print("🔒 Reusing existing tests (coverage already converged)")
+        tester_output = {
+            "test_files_created": existing_tests,
+            "num_tests_generated": 0
+        }
+    else:
+        tester_output = tester_agent(planner_output)
+
     pipeline_state["tester_output"] = tester_output
 
-    execution_input = {
+    # ─────────────────────────────────────────
+    # 3️⃣ EXECUTOR
+    # ─────────────────────────────────────────
+    print("\n🔹 Running Executor Agent...")
+    executor_output = executor_agent({
         "execution_strategy": "pytest",
         "test_files": tester_output["test_files_created"]
-    }
-
-    # 🔹 3. EXECUTOR
-    print("\n🔹 Running Executor Agent...")
-    executor_output = executor_agent(execution_input)
+    })
     pipeline_state["executor_output"] = executor_output
 
     status = executor_output.get("status")
     coverage = executor_output.get("coverage_percent")
 
-    # 🔹 4. ONE‑SHOT COVERAGE HEALING (NO LOOPS)
+    # ─────────────────────────────────────────
+    # 4️⃣ ONE‑SHOT COVERAGE HEALING (ONLY ONCE)
+    # ─────────────────────────────────────────
     if (
         ENABLE_COVERAGE_HEALING
         and status == "pass"
         and coverage is not None
         and coverage < COVERAGE_THRESHOLD
     ):
-        print(f"\n🧠 One‑time Coverage Healing triggered (coverage={coverage:.2f}%)")
+        print(f"\n🧠 Coverage Healing triggered ({coverage:.2f}%)")
 
         try:
             executor_output = healing_hook(
@@ -68,14 +97,16 @@ def run_pipeline(repo_event: dict) -> dict:
                 executor_output=executor_output
             )
             pipeline_state["executor_output"] = executor_output
-        except Exception:
-            print("⚠️ Coverage healing skipped (LLM unavailable)")
 
-        # refresh values once
-        status = executor_output.get("status", status)
-        coverage = executor_output.get("coverage_percent", coverage)
+            status = executor_output.get("status", status)
+            coverage = executor_output.get("coverage_percent", coverage)
 
-    # 🔹 5. FAILURE ANALYSIS (ONLY IF FAILS)
+        except Exception as e:
+            print("⚠️ Coverage healing skipped:", e)
+
+    # ─────────────────────────────────────────
+    # 5️⃣ FAILURE ANALYSIS
+    # ─────────────────────────────────────────
     if status in ("fail", "error"):
         print("\n🔍 Running Failure Analysis Agent...")
         failure_analysis = failure_analysis_agent(executor_output)
@@ -83,20 +114,24 @@ def run_pipeline(repo_event: dict) -> dict:
 
         next_step = failure_analysis.get("next_step")
 
-        if next_step == "regenerate_tests_for_coverage":
-            print("🧠 Coverage gap detected → rerun orchestrator manually")
-        elif next_step == "suggest_code_fix":
+        if next_step == "suggest_code_fix":
             print("🛠️ Code bug detected")
         elif next_step == "regenerate_tests":
             print("🔁 Test bug detected")
+        elif next_step == "regenerate_tests_for_coverage":
+            print("📉 Coverage gap detected")
+        elif next_step == "manual_review":
+            print("👨‍💻 Manual review required")
         else:
             print(f"⚠️ Unhandled pipeline action: {next_step}")
 
-    # 🔹 6. FINAL STATUS
+    # ─────────────────────────────────────────
+    # 6️⃣ FINAL STATUS
+    # ─────────────────────────────────────────
     if status == "pass":
-        print("\n✅ Pipeline completed successfully")
+        print("\n✅ CI PASSED")
         if coverage is not None:
-            print(f"📊 Coverage after run : {coverage:.2f}%")
+            print(f"📊 Coverage : {coverage:.2f}%")
 
     elif status == "fail":
         passed = executor_output.get("passed_tests", 0)
@@ -105,14 +140,18 @@ def run_pipeline(repo_event: dict) -> dict:
         print("\nTest Results Summary")
         print(f"Passed : {passed}")
         print(f"Failed : {failed}")
+
         if coverage is not None:
             print(f"📊 Coverage : {coverage:.2f}%")
 
     else:
-        print("\nCI Infrastructure Error")
+        print("\n🚨 CI Infrastructure Error")
 
-    # 🔹 7. SAVE METRICS
+    # ─────────────────────────────────────────
+    # 7️⃣ SAVE METRICS
+    # ─────────────────────────────────────────
     os.makedirs("metrics", exist_ok=True)
+
     metrics = {
         "run_id": run_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -124,7 +163,9 @@ def run_pipeline(repo_event: dict) -> dict:
     with open("metrics/run_metrics.json", "a") as f:
         f.write(json.dumps(metrics) + "\n")
 
-    # 🔹 8. SAVE RUN STATE
+    # ─────────────────────────────────────────
+    # 8️⃣ SAVE RUN STATE
+    # ─────────────────────────────────────────
     os.makedirs("runs", exist_ok=True)
     pipeline_state["end_time"] = datetime.now(timezone.utc).isoformat()
 
@@ -134,7 +175,10 @@ def run_pipeline(repo_event: dict) -> dict:
     return pipeline_state
 
 
-# 🔹 MANUAL RUN
+# ─────────────────────────────────────────────
+# MANUAL RUN
+# ─────────────────────────────────────────────
+
 if __name__ == "__main__":
     repo_event = {
         "changed_files": ["src/payments.py"],

@@ -3,9 +3,9 @@
 import sys
 import os
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from datetime import datetime, timezone
-import json
+import json # Used for repository and export_report tests
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SRC_DIR = os.path.join(ROOT_DIR, "src")
@@ -13,24 +13,70 @@ sys.path.insert(0, SRC_DIR)
 
 from payments import *
 
+# --- Helper Mocks for PaymentService tests ---
+# These mock classes allow injecting controlled behavior into PaymentService
+# without depending on actual file system or random outcomes.
 
-@pytest.fixture
-def payment_repo(tmp_path):
-    repo_file = tmp_path / "payments.json"
-    # Ensure the file is empty at the start of each test
-    with open(repo_file, "w") as f:
-        json.dump([], f)
-    return PaymentRepository(str(repo_file))
+class MockRepo:
+    def __init__(self):
+        self.payments = []
 
+    def save(self, payment):
+        p_data = {
+            "payment_id": payment.payment_id,
+            "amount": payment.amount,
+            "currency": payment.currency,
+            "user_id": payment.user_id,
+            "status": payment.status,
+            "created_at": payment.created_at.isoformat()
+        }
+        self.payments.append(p_data)
 
-def test_payment_initial_status_and_status_changes():
-    payment = Payment("p1", 100, "USD", "u1")
-    assert payment.payment_id == "p1"
-    assert payment.amount == 100
-    assert payment.currency == "USD"
-    assert payment.user_id == "u1"
+    def update_status(self, payment_id, status):
+        for p in self.payments:
+            if p["payment_id"] == payment_id:
+                p["status"] = status
+                break
+
+    def get_by_user(self, user_id):
+        return [p for p in self.payments if p["user_id"] == user_id]
+
+    def _load(self):
+        return self.payments
+
+    def _write(self, data):
+        self.payments = data
+
+class MockGateway:
+    def __init__(self, charge_result=True):
+        self._charge_result = charge_result
+
+    def charge(self, payment, rand=None):
+        return self._charge_result
+
+class MockFraud:
+    def __init__(self, is_fraud_result=False):
+        self._is_fraud_result = is_fraud_result
+
+    def is_fraud(self, payment):
+        return self._is_fraud_result
+
+# --- Tests ---
+
+def test_payment_init_and_status_changes():
+    payment_id = "test_payment_1"
+    amount = 100
+    currency = "USD"
+    user_id = "user_123"
+    payment = Payment(payment_id, amount, currency, user_id)
+
+    assert payment.payment_id == payment_id
+    assert payment.amount == amount
+    assert payment.currency == currency
+    assert payment.user_id == user_id
     assert payment.status == "CREATED"
     assert isinstance(payment.created_at, datetime)
+    assert payment.created_at.tzinfo == timezone.utc
 
     payment.mark_success()
     assert payment.status == "SUCCESS"
@@ -38,277 +84,288 @@ def test_payment_initial_status_and_status_changes():
     payment.mark_failed()
     assert payment.status == "FAILED"
 
+def test_wallet_credit_valid():
+    wallet = Wallet("user_1")
+    initial_balance = wallet.balance
+    credit_amount = 50
+    wallet.credit(credit_amount)
 
-def test_wallet_credit_valid_amount():
-    wallet = Wallet("u1")
-    wallet.credit(100)
-    assert wallet.balance == 100
-    assert wallet.transactions == [("CREDIT", 100)]
+    assert wallet.balance == initial_balance + credit_amount
+    assert ("CREDIT", credit_amount) in wallet.transactions
 
-    wallet.credit(50.5)
-    assert wallet.balance == 150.5
-    assert wallet.transactions == [("CREDIT", 100), ("CREDIT", 50.5)]
-
-
-def test_wallet_debit_sufficient_and_insufficient_funds():
-    wallet = Wallet("u1")
-    wallet.credit(200)
-
-    # Sufficient funds
-    assert wallet.debit(100) is True
-    assert wallet.balance == 100
-    assert wallet.transactions == [("CREDIT", 200), ("DEBIT", 100)]
-
-    # Insufficient funds
-    assert wallet.debit(150) is False
-    assert wallet.balance == 100  # Balance should not change
-    assert len(wallet.transactions) == 2  # No new transaction
-
-
-def test_wallet_credit_invalid_amount_raises_error():
-    wallet = Wallet("u1")
+def test_wallet_credit_invalid_raises_error():
+    wallet = Wallet("user_2")
     with pytest.raises(ValueError, match="Invalid credit amount"):
         wallet.credit(0)
-    assert wallet.balance == 0
     with pytest.raises(ValueError, match="Invalid credit amount"):
         wallet.credit(-10)
     assert wallet.balance == 0
+    assert not wallet.transactions
 
+def test_wallet_debit_sufficient():
+    wallet = Wallet("user_3")
+    wallet.credit(100)
+    debit_amount = 75
+    result = wallet.debit(debit_amount)
 
-def test_payment_repo_save_and_load(payment_repo):
-    payment = Payment("p_test_1", 200, "EUR", "u_test_1")
-    payment_repo.save(payment)
-
-    loaded_payments = payment_repo.get_by_user("u_test_1")
-    assert len(loaded_payments) == 1
-    assert loaded_payments[0]["payment_id"] == "p_test_1"
-    assert loaded_payments[0]["amount"] == 200
-    assert loaded_payments[0]["status"] == "CREATED"
-
-
-def test_payment_repo_update_status(payment_repo):
-    payment = Payment("p_test_2", 300, "USD", "u_test_2")
-    payment_repo.save(payment)
-
-    payment_repo.update_status("p_test_2", "SUCCESS")
-    loaded_payments = payment_repo.get_by_user("u_test_2")
-    assert loaded_payments[0]["status"] == "SUCCESS"
-
-    payment_repo.update_status("non_existent_id", "REFUNDED") # Should not error
-    loaded_payments = payment_repo.get_by_user("u_test_2")
-    assert loaded_payments[0]["status"] == "SUCCESS"
-
-
-def test_payment_repo_get_by_user(payment_repo):
-    payment1 = Payment("p_test_3a", 100, "USD", "u_test_3")
-    payment2 = Payment("p_test_3b", 200, "EUR", "u_test_3")
-    payment3 = Payment("p_test_3c", 50, "INR", "u_test_other")
-    payment_repo.save(payment1)
-    payment_repo.save(payment2)
-    payment_repo.save(payment3)
-
-    user_payments = payment_repo.get_by_user("u_test_3")
-    assert len(user_payments) == 2
-    assert {p["payment_id"] for p in user_payments} == {"p_test_3a", "p_test_3b"}
-
-    other_user_payments = payment_repo.get_by_user("u_test_other")
-    assert len(other_user_payments) == 1
-    assert other_user_payments[0]["payment_id"] == "p_test_3c"
-
-    no_payments = payment_repo.get_by_user("non_existent_user")
-    assert len(no_payments) == 0
-
-
-def test_fraud_checker_non_fraudulent_payment():
-    checker = FraudChecker()
-    payment = Payment("p1", 500, "USD", "u1")
-    assert checker.is_fraud(payment) is False
-    payment = Payment("p2", 99999, "INR", "u1")
-    assert checker.is_fraud(payment) is False
-
-
-def test_fraud_checker_fraudulent_amount_and_currency():
-    checker = FraudChecker()
-    payment = Payment("p1", 100001, "USD", "u1") # Over limit
-    assert checker.is_fraud(payment) is True
-    payment = Payment("p2", 100, "JPY", "u1") # Invalid currency
-    assert checker.is_fraud(payment) is True
-    payment = Payment("p3", 100001, "JPY", "u1") # Both
-    assert checker.is_fraud(payment) is True
-
-
-def test_payment_gateway_charge_success_and_failure():
-    gateway = PaymentGateway()
-    payment = Payment("p1", 100, "USD", "u1")
-
-    # Mock rand to always return a value < 8 (success)
-    mock_rand_success = MagicMock(return_value=7)
-    assert gateway.charge(payment, rand=mock_rand_success) is True
-
-    # Mock rand to always return a value >= 8 (failure)
-    mock_rand_failure = MagicMock(return_value=8)
-    assert gateway.charge(payment, rand=mock_rand_failure) is False
-
-
-def test_payment_service_add_funds():
-    service = PaymentService(repo=MagicMock(), gateway=MagicMock(), fraud=MagicMock())
-    balance = service.add_funds("user123", 100)
-    assert balance == 100
-    assert service.wallets["user123"].balance == 100
-
-    balance = service.add_funds("user123", 50)
-    assert balance == 150
-    assert service.wallets["user123"].balance == 150
-
-
-def test_payment_service_process_payment_success():
-    mock_repo = MagicMock()
-    mock_fraud = MagicMock(return_value=False)
-    mock_gateway = MagicMock(return_value=True) # Gateway success
-
-    service = PaymentService(repo=mock_repo, gateway=mock_gateway, fraud=mock_fraud)
-    service.add_funds("user456", 200)
-
-    result = service.process_payment("user456", 100, "USD")
     assert result is True
-    assert service.wallets["user456"].balance == 100
-    mock_fraud.is_fraud.assert_called_once()
-    mock_gateway.charge.assert_called_once()
-    mock_repo.save.assert_called_once()
-    assert mock_repo.save.call_args[0][0].status == "SUCCESS"
+    assert wallet.balance == 25
+    assert ("DEBIT", debit_amount) in wallet.transactions
 
+def test_wallet_debit_insufficient():
+    wallet = Wallet("user_4")
+    wallet.credit(50)
+    debit_amount = 75
+    result = wallet.debit(debit_amount)
 
-def test_payment_service_process_payment_fraud_detected():
-    mock_repo = MagicMock()
-    mock_fraud = MagicMock(return_value=True) # Fraud detected
-    mock_gateway = MagicMock()
-
-    service = PaymentService(repo=mock_repo, gateway=mock_gateway, fraud=mock_fraud)
-    service.add_funds("user789", 200)
-
-    result = service.process_payment("user789", 150000, "USD") # Fraudulent amount
     assert result is False
-    assert service.wallets["user789"].balance == 200 # Wallet not debited
-    mock_fraud.is_fraud.assert_called_once()
-    mock_gateway.charge.assert_not_called()
-    mock_repo.save.assert_called_once()
-    assert mock_repo.save.call_args[0][0].status == "FAILED"
+    assert wallet.balance == 50
+    assert ("DEBIT", debit_amount) not in wallet.transactions
 
+def test_fraud_checker_is_not_fraud():
+    fraud_checker = FraudChecker()
+    payment = Payment("p1", 500, "USD", "u1")
+    assert fraud_checker.is_fraud(payment) is False
 
-def test_payment_service_process_payment_insufficient_balance():
-    mock_repo = MagicMock()
-    mock_fraud = MagicMock(return_value=False)
-    mock_gateway = MagicMock()
+def test_fraud_checker_is_fraud_amount():
+    fraud_checker = FraudChecker()
+    payment = Payment("p2", 100001, "USD", "u1")
+    assert fraud_checker.is_fraud(payment) is True
 
-    service = PaymentService(repo=mock_repo, gateway=mock_gateway, fraud=mock_fraud)
-    service.add_funds("user101", 50)
+def test_fraud_checker_is_fraud_currency():
+    fraud_checker = FraudChecker()
+    payment = Payment("p3", 500, "GBP", "u1")
+    assert fraud_checker.is_fraud(payment) is True
 
-    result = service.process_payment("user101", 100, "USD") # More than balance
-    assert result is False
-    assert service.wallets["user101"].balance == 50 # Wallet not debited
-    mock_fraud.is_fraud.assert_called_once()
-    mock_gateway.charge.assert_not_called()
-    mock_repo.save.assert_called_once()
-    assert mock_repo.save.call_args[0][0].status == "FAILED"
+def test_payment_gateway_charge_controlled_outcomes():
+    gateway = PaymentGateway()
 
+    with patch('random.randint', return_value=1) as mock_rand_success:
+        payment = Payment("p_success", 100, "USD", "u1")
+        assert gateway.charge(payment) is True
+        mock_rand_success.assert_called_once_with(1, 10)
 
-def test_payment_service_process_payment_gateway_failure():
-    mock_repo = MagicMock()
-    mock_fraud = MagicMock(return_value=False)
-    mock_gateway = MagicMock(return_value=False) # Gateway failure
+    with patch('random.randint', return_value=8) as mock_rand_fail:
+        payment = Payment("p_fail", 100, "USD", "u1")
+        assert gateway.charge(payment) is False
+        mock_rand_fail.assert_called_once_with(1, 10)
 
-    service = PaymentService(repo=mock_repo, gateway=mock_gateway, fraud=mock_fraud)
-    service.add_funds("user112", 200)
+def test_payment_repository_save_and_load(tmp_path):
+    repo_path = tmp_path / "payments.json"
+    repo = PaymentRepository(str(repo_path))
 
-    result = service.process_payment("user112", 100, "USD")
-    assert result is False
-    assert service.wallets["user112"].balance == 200 # Wallet debited then credited back
-    mock_fraud.is_fraud.assert_called_once()
-    mock_gateway.charge.assert_called_once()
-    mock_repo.save.assert_called_once()
-    assert mock_repo.save.call_args[0][0].status == "FAILED"
+    payment = Payment("p_id_1", 100, "USD", "user_abc")
+    repo.save(payment)
 
+    loaded_data = repo._load()
+    assert len(loaded_data) == 1
+    assert loaded_data[0]["payment_id"] == payment.payment_id
+    assert loaded_data[0]["status"] == "CREATED"
 
-def test_payment_service_process_payment_negative_amount_raises_error():
-    service = PaymentService(repo=MagicMock(), gateway=MagicMock(), fraud=MagicMock())
+    payment2 = Payment("p_id_2", 200, "EUR", "user_abc")
+    repo.save(payment2)
+    loaded_data_2 = repo._load()
+    assert len(loaded_data_2) == 2
+    assert loaded_data_2[1]["payment_id"] == payment2.payment_id
+
+def test_payment_repository_update_status_and_get_by_user(tmp_path):
+    repo_path = tmp_path / "payments.json"
+    repo = PaymentRepository(str(repo_path))
+
+    payment1 = Payment("p_id_A", 100, "USD", "user_X")
+    payment2 = Payment("p_id_B", 200, "EUR", "user_Y")
+    payment3 = Payment("p_id_C", 50, "INR", "user_X")
+
+    repo.save(payment1)
+    repo.save(payment2)
+    repo.save(payment3)
+
+    repo.update_status("p_id_A", "SUCCESS")
+    loaded_data = repo._load()
+    assert next(p for p in loaded_data if p["payment_id"] == "p_id_A")["status"] == "SUCCESS"
+    assert next(p for p in loaded_data if p["payment_id"] == "p_id_B")["status"] == "CREATED"
+
+    user_x_payments = repo.get_by_user("user_X")
+    assert len(user_x_payments) == 2
+    assert {p["payment_id"] for p in user_x_payments} == {"p_id_A", "p_id_C"}
+    assert all(p["user_id"] == "user_X" for p in user_x_payments)
+
+    user_y_payments = repo.get_by_user("user_Y")
+    assert len(user_y_payments) == 1
+    assert user_y_payments[0]["payment_id"] == "p_id_B"
+
+def test_payment_service_add_funds_and_user_balance():
+    service = PaymentService(repo=MockRepo(), gateway=MockGateway(), fraud=MockFraud())
+    user_id = "user_add_funds"
+
+    balance1 = service.add_funds(user_id, 100)
+    assert balance1 == 100
+    assert service.user_balance(user_id) == 100
+
+    balance2 = service.add_funds(user_id, 50)
+    assert balance2 == 150
+    assert service.user_balance(user_id) == 150
+
+    user_id_2 = "user_add_funds_2"
+    service.add_funds(user_id_2, 200)
+    assert service.user_balance(user_id_2) == 200
+    assert service.user_balance(user_id) == 150
+
+def test_payment_service_process_payment_invalid_amount_raises_error():
+    service = PaymentService(repo=MockRepo(), gateway=MockGateway(), fraud=MockFraud())
+    user_id = "user_invalid_amt"
+    service.add_funds(user_id, 100)
+
     with pytest.raises(ValueError, match="Invalid amount"):
-        service.process_payment("user123", -10, "USD")
+        service.process_payment(user_id, -10, "USD")
+    with pytest.raises(ValueError, match="Invalid amount"):
+        service.process_payment(user_id, 0, "USD")
 
+    assert service.user_balance(user_id) == 100
 
-def test_payment_service_refund_success(payment_repo):
-    # Simulate a successful payment in the repo first
-    user_id = "user_ref"
-    amount = 75
-    payment_id = str(uuid.uuid4())
-    payment = Payment(payment_id, amount, "EUR", user_id)
-    payment.mark_success()
-    payment_repo.save(payment)
+def test_payment_service_process_payment_fraudulent():
+    mock_repo = MockRepo()
+    mock_fraud = MockFraud(is_fraud_result=True)
+    service = PaymentService(repo=mock_repo, gateway=MockGateway(), fraud=mock_fraud)
+    user_id = "user_fraud"
+    service.add_funds(user_id, 100)
 
-    service = PaymentService(repo=payment_repo, gateway=MagicMock(), fraud=MagicMock())
-    service.add_funds(user_id, 100) # Initial wallet balance
+    result = service.process_payment(user_id, 50, "USD")
+    assert result is False
+    assert service.user_balance(user_id) == 100
+    assert len(mock_repo.payments) == 1
+    assert mock_repo.payments[0]["status"] == "FAILED"
+    assert mock_repo.payments[0]["user_id"] == user_id
 
-    service.refund(payment_id)
-    assert service.wallets[user_id].balance == (100 + amount)
-    assert service.wallets[user_id].transactions[-1] == ("CREDIT", amount)
+def test_payment_service_process_payment_insufficient_wallet_balance():
+    mock_repo = MockRepo()
+    service = PaymentService(repo=mock_repo, gateway=MockGateway(), fraud=MockFraud())
+    user_id = "user_insufficient"
+    service.add_funds(user_id, 50)
 
-    # Verify status in repo is updated
-    loaded_payments = payment_repo.get_by_user(user_id)
-    assert loaded_payments[0]["status"] == "REFUNDED"
+    result = service.process_payment(user_id, 100, "USD")
+    assert result is False
+    assert service.user_balance(user_id) == 50
+    assert len(mock_repo.payments) == 1
+    assert mock_repo.payments[0]["status"] == "FAILED"
+    assert mock_repo.payments[0]["user_id"] == user_id
 
+def test_payment_service_process_payment_successful():
+    mock_repo = MockRepo()
+    mock_gateway = MockGateway(charge_result=True)
+    service = PaymentService(repo=mock_repo, gateway=mock_gateway, fraud=MockFraud())
+    user_id = "user_success"
+    service.add_funds(user_id, 200)
 
-def test_payment_service_user_balance():
-    service = PaymentService(repo=MagicMock(), gateway=MagicMock(), fraud=MagicMock())
-    service.add_funds("user_bal", 100)
-    service.add_funds("user_bal", 50)
+    initial_balance = service.user_balance(user_id)
+    payment_amount = 100
+    result = service.process_payment(user_id, payment_amount, "USD")
+    assert result is True
+    assert service.user_balance(user_id) == initial_balance - payment_amount
+    assert len(mock_repo.payments) == 1
+    assert mock_repo.payments[0]["status"] == "SUCCESS"
+    assert mock_repo.payments[0]["user_id"] == user_id
+    assert mock_repo.payments[0]["amount"] == payment_amount
 
-    balance = service.user_balance("user_bal")
-    assert balance == 150
+def test_payment_service_process_payment_gateway_failure_refunds():
+    mock_repo = MockRepo()
+    mock_gateway = MockGateway(charge_result=False)
+    service = PaymentService(repo=mock_repo, gateway=mock_gateway, fraud=MockFraud())
+    user_id = "user_gateway_fail"
+    service.add_funds(user_id, 200)
 
-    # Test for a user with no funds added yet
-    balance_new_user = service.user_balance("new_user")
-    assert balance_new_user == 0
+    initial_balance = service.user_balance(user_id)
+    payment_amount = 100
+    result = service.process_payment(user_id, payment_amount, "USD")
+    assert result is False
+    assert service.user_balance(user_id) == initial_balance
+    assert len(mock_repo.payments) == 1
+    assert mock_repo.payments[0]["status"] == "FAILED"
+    assert mock_repo.payments[0]["user_id"] == user_id
+    assert mock_repo.payments[0]["amount"] == payment_amount
 
+def test_payment_service_refund_existing_payment():
+    mock_repo = MockRepo()
+    mock_gateway = MockGateway(charge_result=True)
+    service = PaymentService(repo=mock_repo, gateway=mock_gateway, fraud=MockFraud())
+    user_id = "user_refund"
+    service.add_funds(user_id, 200)
 
-def test_batch_payments(payment_repo):
-    mock_fraud = MagicMock(side_effect=[False, True, False]) # 1st OK, 2nd fraud, 3rd OK
-    mock_gateway = MagicMock(side_effect=[True, True]) # For 1st and 3rd successful charges
+    payment_amount = 100
+    service.process_payment(user_id, payment_amount, "USD")
+    assert service.user_balance(user_id) == 100
 
-    service = PaymentService(repo=payment_repo, gateway=mock_gateway, fraud=mock_fraud)
-    service.add_funds("batch_user", 200) # Enough for 1st and 3rd
+    payment_id_to_refund = mock_repo.payments[0]["payment_id"]
+
+    service.refund(payment_id_to_refund)
+    assert service.user_balance(user_id) == 200
+    assert mock_repo.payments[0]["status"] == "REFUNDED"
+    assert service.wallets[user_id].transactions[-1] == ("CREDIT", payment_amount)
+
+def test_batch_payments_mixed_results():
+    mock_repo = MockRepo()
+    mock_gateway = MockGateway(charge_result=True)
+    mock_fraud = MockFraud()
+    mock_fraud.is_fraud = lambda p: p.amount > 500 or p.currency == "GBP"
+
+    service = PaymentService(repo=mock_repo, gateway=mock_gateway, fraud=mock_fraud)
+    user_id = "batch_user"
+    service.add_funds(user_id, 1000)
 
     payments_to_process = [
-        (50, "USD"),    # Should succeed
-        (150000, "USD"), # Fraudulent amount, should fail
-        (100, "EUR"),   # Should succeed
-        (-10, "USD")    # Invalid amount, should fail
+        (100, "USD"),
+        (200, "EUR"),
+        (700, "USD"),
+        (-50, "USD"),
+        (50, "GBP"),
+        (150, "INR")
     ]
 
-    results = batch_payments(service, "batch_user", payments_to_process)
+    results = batch_payments(service, user_id, payments_to_process)
 
-    assert results == [True, False, True, False]
-    assert service.wallets["batch_user"].balance == 50 # 200 - 50 - 100
-    assert mock_fraud.is_fraud.call_count == 3 # Called for 3 valid payments
-    assert mock_gateway.charge.call_count == 2 # Called for 1st and 3rd payments
+    assert results == [True, True, False, False, False, True]
+    assert service.user_balance(user_id) == 1000 - 100 - 200 - 150
+    assert len(mock_repo.payments) == 5
+    assert sum(1 for p in mock_repo.payments if p["status"] == "SUCCESS") == 3
+    assert sum(1 for p in mock_repo.payments if p["status"] == "FAILED") == 2
 
+def test_export_report_generates_correct_data(tmp_path):
+    repo_path = tmp_path / "payments_export.json"
+    report_path = tmp_path / "report.json"
 
-def test_export_report_creation_and_content(tmp_path):
-    report_path = tmp_path / "test_report.json"
-    service = PaymentService(repo=MagicMock(), gateway=MagicMock(), fraud=MagicMock())
+    service = PaymentService(
+        repo=PaymentRepository(str(repo_path)),
+        gateway=MockGateway(charge_result=True),
+        fraud=MockFraud(is_fraud_result=False)
+    )
 
-    service.add_funds("user_A", 100)
-    service.add_funds("user_B", 200)
-    service.wallets["user_A"].debit(30) # Simulate a transaction
+    user1 = "user_report_1"
+    user2 = "user_report_2"
+
+    service.add_funds(user1, 100)
+    service.process_payment(user1, 20, "USD")
+    service.process_payment(user1, 30, "EUR")
+
+    service.add_funds(user2, 500)
+    service.process_payment(user2, 100, "INR")
 
     export_report(service, str(report_path))
 
-    assert os.path.exists(report_path)
     with open(report_path, "r") as f:
         report_data = json.load(f)
 
-    assert "user_A" in report_data
-    assert report_data["user_A"]["balance"] == 70
-    assert report_data["user_A"]["transactions"] == [["CREDIT", 100], ["DEBIT", 30]]
+    assert user1 in report_data
+    assert user2 in report_data
 
-    assert "user_B" in report_data
-    assert report_data["user_B"]["balance"] == 200
-    assert report_data["user_B"]["transactions"] == [["CREDIT", 200]]
+    assert report_data[user1]["balance"] == 50
+    assert len(report_data[user1]["transactions"]) == 3
+    assert ["CREDIT", 100] in report_data[user1]["transactions"]
+    assert ["DEBIT", 20] in report_data[user1]["transactions"]
+    assert ["DEBIT", 30] in report_data[user1]["transactions"]
+
+    assert report_data[user2]["balance"] == 400
+    assert len(report_data[user2]["transactions"]) == 2
+    assert ["CREDIT", 500] in report_data[user2]["transactions"]
+    assert ["DEBIT", 100] in report_data[user2]["transactions"]
+
+    assert os.path.exists(os.path.dirname(report_path))
