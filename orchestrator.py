@@ -154,6 +154,8 @@ def run_pipeline(repo_event: dict) -> dict:
 
         if coverage is not None:
             print(f"📊 Coverage : {coverage:.2f}%")
+    else:
+        print("\n🚨 CI Infrastructure Error")
 
     # ─────────────────────────────────────────
     # 7️⃣ SAVE METRICS
