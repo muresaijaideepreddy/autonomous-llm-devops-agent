@@ -1,74 +1,80 @@
 import json
 import os
-from agents.tester import tester_agent
-from agents.executor import executor_agent
 
 COVERAGE_THRESHOLD = 98
 
-
 def healing_hook(planner_output: dict, executor_output: dict) -> dict:
     """
-    Coverage Healer Agent
-    Triggered ONLY when:
-    - All tests pass
-    - Coverage < threshold
+    Coverage Healer (CODE-ONLY)
+    ---------------------------
+    Runs ONLY when:
+      - Tests PASS
+      - Coverage < threshold
+
+    Responsibilities:
+      ✔ Detect unreachable / ignorable code
+      ✔ Suggest or apply safe exclusions
+      ❌ MUST NOT generate tests
+      ❌ MUST NOT call tester_agent
     """
 
-    print("🧠 Coverage Healer triggered...")
+    print("🧠 Coverage Healer triggered (code-only)")
 
-    coverage_percent = executor_output.get("coverage_percent")
-    if coverage_percent is None or coverage_percent >= COVERAGE_THRESHOLD:
-        print("✅ Coverage already sufficient, skipping healer")
+    coverage = executor_output.get("coverage_percent")
+    status = executor_output.get("status")
+
+    # Safety checks
+    if status != "pass":
+        print("⛔ Tests did not pass — healer skipped")
         return executor_output
 
-    # -----------------------------
-    # 1️⃣ Load coverage.json
-    # -----------------------------
+    if coverage is None or coverage >= COVERAGE_THRESHOLD:
+        print("✅ Coverage acceptable — healer skipped")
+        return executor_output
+
     if not os.path.exists("coverage.json"):
-        print("❌ coverage.json not found")
+        print("⚠ coverage.json not found — healer skipped")
         return executor_output
 
+    # -----------------------------
+    # Load coverage report
+    # -----------------------------
     with open("coverage.json") as f:
         coverage_data = json.load(f)
 
-    uncovered_files = {}
-    for file, data in coverage_data.get("files", {}).items():
-        missing = data.get("missing_lines", [])
-        if missing:
-            uncovered_files[file] = missing
+    dead_code_candidates = []
 
-    if not uncovered_files:
-        print("✅ No uncovered lines found")
+    for file, data in coverage_data.get("files", {}).items():
+        missing_lines = data.get("missing_lines", [])
+
+        # Healer is conservative:
+        # Only consider very small gaps as potential dead code
+        if 0 < len(missing_lines) <= 2:
+            dead_code_candidates.append({
+                "file": file,
+                "lines": missing_lines
+            })
+
+    if not dead_code_candidates:
+        print("ℹ No safe dead-code candidates found")
         return executor_output
 
-    print("📉 Coverage gaps detected:")
-    for f, lines in uncovered_files.items():
-        print(f"  - {f}: {len(lines)} uncovered lines")
+    # -----------------------------
+    # Report findings (NO mutation)
+    # -----------------------------
+    print("🩹 Potential dead / ignorable code detected:")
 
-    # -----------------------------
-    # 2️⃣ Ask Tester Agent to generate
-    #     tests ONLY for uncovered lines
-    # -----------------------------
-    healer_plan = {
-        "modules_to_test": [
-            os.path.splitext(os.path.basename(f))[0]
-            for f in uncovered_files.keys()
-            if f.startswith("src/")
-        ],
-        "risk_level": "high",
-        "coverage_context": uncovered_files,  # 🔑 NEW
+    for item in dead_code_candidates:
+        print(f"  - {item['file']} → lines {item['lines']}")
+
+    # Healer does NOT modify code automatically
+    # It only reports safe candidates
+    executor_output["healer_report"] = {
+        "dead_code_candidates": dead_code_candidates,
+        "action": "review_or_ignore"
     }
 
-    tester_output = tester_agent(healer_plan)
-
-    # -----------------------------
-    # 3️⃣ Re‑run executor
-    # -----------------------------
-    executor_output = executor_agent({
-        "test_files": tester_output["test_files_created"]
-    })
-
-    executor_output["healed"] = True
-    executor_output["coverage_gap_fixed"] = True
+    executor_output["healed"] = False
+    executor_output["coverage_healer_ran"] = True
 
     return executor_output
