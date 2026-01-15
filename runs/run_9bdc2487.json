@@ -1,0 +1,47 @@
+{
+  "run_id": "run_9bdc2487",
+  "planner_output": {
+    "modules_to_test": [
+      "payments"
+    ],
+    "test_types": [
+      "unit",
+      "edge"
+    ],
+    "risk_level": "high",
+    "reason": "high severity issue affecting ['payments']"
+  },
+  "tester_output": {
+    "test_files_created": [
+      "tests/test_payments_auto.py"
+    ],
+    "num_tests_generated": 19
+  },
+  "executor_output": {
+    "status": "fail",
+    "total_tests": 19,
+    "passed_tests": 18,
+    "failed_tests": [
+      "test_export_report_generates_file - Asser..."
+    ],
+    "failed_test_files": [
+      "FAILED tests/test_payments_auto.py"
+    ],
+    "coverage_percent": 100.0,
+    "uncovered_files": {},
+    "logs": "============================= test session starts ==============================\nplatform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0\nrootdir: /home/brahmanya/autonomous-llm-devops-agent\nplugins: metadata-3.1.1, anyio-4.11.0, mock-3.15.1, json-report-1.5.0, langsmith-0.4.41, cov-7.0.0\ncollected 19 items\n\ntests/test_payments_auto.py ..................F                          [100%]\n\n=================================== FAILURES ===================================\n______________________ test_export_report_generates_file _______________________\n\npayment_service = <payments.PaymentService object at 0x7bb3db8e5cd0>\ntmp_path = PosixPath('/tmp/pytest-of-brahmanya/pytest-27/test_export_report_generates_f0')\nmocker = <pytest_mock.plugin.MockerFixture object at 0x7bb3db872a80>\n\n    def test_export_report_generates_file(payment_service, tmp_path, mocker):\n        report_path = tmp_path / \"test_report.json\"\n    \n        user1_id = str(uuid.uuid4())\n        user2_id = str(uuid.uuid4())\n    \n        payment_service.add_funds(user1_id, 200)\n        payment_service.add_funds(user2_id, 150)\n    \n        mocker.patch.object(PaymentGateway, 'charge', return_value=True)\n        mocker.patch.object(FraudChecker, 'is_fraud', return_value=False)\n    \n        payment_service.process_payment(user1_id, 50, \"USD\")\n        payment_service.process_payment(user2_id, 25, \"EUR\")\n    \n        export_report(payment_service, path=str(report_path))\n    \n        assert report_path.exists()\n    \n        with open(report_path, \"r\") as f:\n            report_data = json.load(f)\n    \n        assert user1_id in report_data\n        assert user2_id in report_data\n        assert report_data[user1_id][\"balance\"] == 150\n>       assert (\"DEBIT\", 50) in report_data[user1_id][\"transactions\"]\nE       AssertionError: assert ('DEBIT', 50) in [['CREDIT', 200], ['DEBIT', 50]]\n\ntests/test_payments_auto.py:346: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_payments_auto.py::test_export_report_generates_file - Asser...\n========================= 1 failed, 18 passed in 0.06s =========================\n",
+    "summary_report": "\u274c 1 failed, 18 passed (Total: 19)",
+    "execution_time_ms": 512
+  },
+  "failure_analysis": {
+    "failure_type": "code_bug",
+    "reason": "Assertion failure indicates business logic mismatch",
+    "next_step": "suggest_code_fix",
+    "confidence": "high",
+    "failed_tests": [
+      "test_export_report_generates_file - Asser..."
+    ]
+  },
+  "start_time": "2026-01-15T04:18:55.587580+00:00",
+  "end_time": "2026-01-15T04:19:45.861236+00:00"
+}
