@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autonomous Testing Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <span class="logo-icon">🤖</span>
+                <h1>Autonomous Testing Dashboard</h1>
+            </div>
+            <div class="header-actions">
+                <button class="btn-refresh" onclick="refreshData()">
+                    <span class="refresh-icon">🔄</span> Refresh
+                </button>
+                <div class="status-indicator">
+                    <span class="status-dot"></span>
+                    <span id="connectionStatus">Polling...</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Dashboard -->
+    <main class="dashboard">
+        <!-- Stats Cards Row -->
+        <section class="stats-row">
+            <div class="stat-card stat-runs">
+                <div class="stat-icon">📁</div>
+                <div class="stat-content">
+                    <span class="stat-value" id="totalRuns">--</span>
+                    <span class="stat-label">Total Runs</span>
+                </div>
+            </div>
+            <div class="stat-card stat-coverage">
+                <div class="stat-icon">📊</div>
+                <div class="stat-content">
+                    <span class="stat-value" id="latestCoverage">--</span>
+                    <span class="stat-label">Latest Coverage</span>
+                </div>
+            </div>
+            <div class="stat-card stat-passed">
+                <div class="stat-icon">✅</div>
+                <div class="stat-content">
+                    <span class="stat-value" id="passRate">--</span>
+                    <span class="stat-label">Pass Rate</span>
+                </div>
+            </div>
+            <div class="stat-card stat-time">
+                <div class="stat-icon">⚡</div>
+                <div class="stat-content">
+                    <span class="stat-value" id="avgTime">--</span>
+                    <span class="stat-label">Avg Exec Time</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Charts Section -->
+        <section class="charts-section">
+            <div class="chart-container">
+                <h3>Coverage Trend</h3>
+                <canvas id="coverageChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3>Test Results Distribution</h3>
+                <canvas id="resultsChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Latest Run Detail -->
+        <section class="latest-run-section">
+            <h2>Latest Pipeline Run</h2>
+            <div class="run-detail-card" id="latestRunCard">
+                <div class="run-header">
+                    <span class="run-id" id="latestRunId">Loading...</span>
+                    <span class="run-status" id="latestRunStatus">--</span>
+                </div>
+                <div class="run-info-grid">
+                    <div class="run-info-item">
+                        <label>Started</label>
+                        <span id="latestStartTime">--</span>
+                    </div>
+                    <div class="run-info-item">
+                        <label>Duration</label>
+                        <span id="latestDuration">--</span>
+                    </div>
+                    <div class="run-info-item">
+                        <label>Coverage</label>
+                        <span id="latestRunCoverage">--</span>
+                    </div>
+                    <div class="run-info-item">
+                        <label>Tests</label>
+                        <span id="latestTests">--</span>
+                    </div>
+                </div>
+                
+                <!-- Agent Steps -->
+                <div class="agent-steps">
+                    <h4>Agent Pipeline</h4>
+                    <div class="steps-timeline">
+                        <div class="step" id="stepPlanner">
+                            <span class="step-icon">🎯</span>
+                            <span class="step-name">Planner</span>
+                            <span class="step-status">--</span>
+                        </div>
+                        <div class="step" id="stepTester">
+                            <span class="step-icon">🧪</span>
+                            <span class="step-name">Tester</span>
+                            <span class="step-status">--</span>
+                        </div>
+                        <div class="step" id="stepExecutor">
+                            <span class="step-icon">⚙️</span>
+                            <span class="step-name">Executor</span>
+                            <span class="step-status">--</span>
+                        </div>
+                        <div class="step" id="stepHealer">
+                            <span class="step-icon">🩹</span>
+                            <span class="step-name">Healer</span>
+                            <span class="step-status">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Planner Output -->
+                <div class="output-section" id="plannerSection">
+                    <h4>🎯 Planner Output</h4>
+                    <div class="output-content" id="plannerOutput">--</div>
+                </div>
+
+                <!-- Failed Tests -->
+                <div class="output-section error-section" id="failedTestsSection" style="display: none;">
+                    <h4>❌ Failed Tests</h4>
+                    <ul class="failed-list" id="failedTestsList"></ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Run History -->
+        <section class="history-section">
+            <h2>Run History</h2>
+            <div class="runs-table-container">
+                <table class="runs-table">
+                    <thead>
+                        <tr>
+                            <th>Run ID</th>
+                            <th>Status</th>
+                            <th>Coverage</th>
+                            <th>Tests</th>
+                            <th>Time</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="runsTableBody">
+                        <tr><td colspan="6" class="loading">Loading runs...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>Autonomous Testing Framework • Dashboard v1.0</p>
+    </footer>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
