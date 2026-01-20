@@ -140,25 +140,46 @@ def run_pipeline(repo_event: dict) -> dict:
             log_error(f"Failure type: {failure_analysis.get('failure_type')}")
             log_info(f"Next action : {failure_analysis.get('next_step')}")
 
-        # 4d️⃣ ENHANCED HEALING
-        if ENABLE_COVERAGE_HEALING and (
-            (status == "pass" and coverage is not None and coverage < COVERAGE_THRESHOLD)
-            or (status == "fail" and failure_analysis and failure_analysis.get("failure_type") == "test_bug")
-        ):
-            log_warn(f"Enhanced healing triggered")
-
-            executor_output = healing_agent(
+        # 4d️⃣ HEALER ANALYSIS + TARGETED TEST GENERATION
+        if ENABLE_COVERAGE_HEALING and status == "pass" and coverage is not None and coverage < COVERAGE_THRESHOLD:
+            log_step("Healer Agent (Analysis)")
+            
+            # Healer analyzes and reports gaps
+            healer_report = healing_agent(
                 planner_output=planner_output,
                 executor_output=executor_output,
                 failure_analysis=failure_analysis
             )
-
-            pipeline_state["executor_output"] = executor_output
-            status = executor_output.get("status")
-            coverage = executor_output.get("coverage_percent")
-
-            if coverage is not None:
-                log_info(f"Coverage after healing: {coverage:.2f}%")
+            pipeline_state["healer_report"] = healer_report
+            
+            # If healer found gaps, tester generates targeted tests
+            if healer_report.get("needs_healing") and healer_report.get("coverage_context"):
+                log_step("Tester Agent (Targeted Tests)")
+                
+                # Build targeted plan with coverage context from healer
+                targeted_plan = {
+                    "modules_to_test": healer_report.get("modules_needing_tests", []),
+                    "risk_level": planner_output.get("risk_level", "medium"),
+                    "coverage_context": healer_report.get("coverage_context")
+                }
+                
+                tester_output = tester_agent(targeted_plan)
+                pipeline_state["tester_output"] = tester_output
+                
+                # Re-run executor with new targeted tests
+                if tester_output.get("test_files_created"):
+                    log_step("Executor Agent (Targeted Tests)")
+                    executor_output = executor_agent({
+                        "execution_strategy": "pytest",
+                        "test_files": tester_output["test_files_created"]
+                    })
+                    
+                    pipeline_state["executor_output"] = executor_output
+                    status = executor_output.get("status")
+                    coverage = executor_output.get("coverage_percent")
+                    
+                    if coverage is not None:
+                        log_info(f"Coverage after targeted tests: {coverage:.2f}%")
     else:
         log_success("Coverage threshold satisfied — agents idle")
 

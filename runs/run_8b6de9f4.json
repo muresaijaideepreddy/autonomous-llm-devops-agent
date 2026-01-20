@@ -1,0 +1,154 @@
+{
+  "run_id": "run_8b6de9f4",
+  "planner_output": {
+    "modules_to_test": [
+      "payments"
+    ],
+    "test_types": [
+      "unit"
+    ],
+    "risk_level": "medium",
+    "reason": "medium severity issue affecting ['payments']"
+  },
+  "tester_output": {
+    "test_files_created": [
+      "tests/test_payments_auto.py"
+    ],
+    "num_tests_generated": 15
+  },
+  "executor_output": {
+    "status": "fail",
+    "total_tests": 15,
+    "passed_tests": 14,
+    "failed_tests": [
+      "test_payment_service_process_payment_invalid_amount"
+    ],
+    "failed_test_files": [
+      "FAILED tests/test_payments_auto.py"
+    ],
+    "coverage_percent": 78.78787878787878,
+    "uncovered_files": {
+      "src/payments.py": [
+        36,
+        57,
+        58,
+        100,
+        136,
+        142,
+        143,
+        144,
+        148,
+        149,
+        150,
+        154,
+        155,
+        156,
+        182,
+        183,
+        184,
+        185,
+        186,
+        187,
+        188,
+        189,
+        197,
+        198,
+        199,
+        200,
+        204,
+        205
+      ]
+    },
+    "logs": "============================= test session starts ==============================\nplatform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0\nrootdir: /home/brahmanya/autonomous-llm-devops-agent\nplugins: metadata-3.1.1, anyio-4.11.0, mock-3.15.1, json-report-1.5.0, langsmith-0.4.41, cov-7.0.0\ncollected 15 items\n\ntests/test_payments_auto.py .......F.......                              [100%]\n\n=================================== FAILURES ===================================\n_____________ test_payment_service_process_payment_invalid_amount ______________\n\n    def test_payment_service_process_payment_invalid_amount():\n        service = PaymentService()\n        user_id = \"test_user_invalid_amount\"\n        with pytest.raises(ValueError, match=\"Invalid amount\"):\n            service.process_payment(user_id, -10, \"USD\")\n>       with pytest.raises(ValueError, match=\"Invalid amount\"):\nE       Failed: DID NOT RAISE <class 'ValueError'>\n\ntests/test_payments_auto.py:138: Failed\n=========================== short test summary info ============================\nFAILED tests/test_payments_auto.py::test_payment_service_process_payment_invalid_amount\n========================= 1 failed, 14 passed in 0.42s =========================\n",
+    "summary_report": "\u274c 1 failed, 14 passed (Total: 15)",
+    "execution_time_ms": 3890
+  },
+  "failure_analysis": {
+    "failure_type": "coverage_gap",
+    "reason": "Coverage below threshold (78.78787878787878%)",
+    "next_step": "regenerate_tests_for_coverage",
+    "confidence": "high",
+    "coverage_percent": 78.78787878787878,
+    "uncovered_lines": []
+  },
+  "start_time": "2026-01-20T22:51:39.608619+00:00",
+  "end_time": "2026-01-20T22:53:06.795208+00:00",
+  "healer_output": {
+    "needs_healing": true,
+    "coverage_percent": 78.78787878787878,
+    "coverage_threshold": 98,
+    "coverage_gap": 19.21,
+    "uncovered_files": {
+      "src/payments.py": [
+        36,
+        57,
+        58,
+        100,
+        136,
+        142,
+        143,
+        144,
+        148,
+        149,
+        150,
+        154,
+        155,
+        156,
+        182,
+        183,
+        184,
+        185,
+        186,
+        187,
+        188,
+        189,
+        197,
+        198,
+        199,
+        200,
+        204,
+        205
+      ]
+    },
+    "coverage_context": {
+      "payments": {
+        "uncovered_lines": [
+          36,
+          57,
+          58,
+          100,
+          136,
+          142,
+          143,
+          144,
+          148,
+          149,
+          150,
+          154,
+          155,
+          156,
+          182,
+          183,
+          184,
+          185,
+          186,
+          187,
+          188,
+          189,
+          197,
+          198,
+          199,
+          200,
+          204,
+          205
+        ],
+        "line_count": 28
+      }
+    },
+    "dead_code_candidates": [],
+    "modules_needing_tests": [
+      "payments"
+    ],
+    "recommendation": "Generate targeted tests for 28 uncovered lines across 1 module(s)."
+  }
+}

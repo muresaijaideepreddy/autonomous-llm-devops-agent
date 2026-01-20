@@ -90,6 +90,10 @@ async def stream_pipeline(commit_id: str = "manual_run"):
 # API ENDPOINTS
 # -----------------------------
 
+# Coverage threshold for pass/fail determination
+COVERAGE_THRESHOLD = 98
+
+
 @app.get("/api/runs")
 async def get_all_runs():
     """Get list of all pipeline runs with basic info, sorted by timestamp (newest first)"""
@@ -100,15 +104,33 @@ async def get_all_runs():
             try:
                 with open(run_file) as f:
                     data = json.load(f)
+                    
+                    executor_output = data.get("executor_output", {})
+                    coverage = executor_output.get("coverage_percent")
+                    
+                    # Determine status based on coverage threshold
+                    if coverage is not None and coverage >= COVERAGE_THRESHOLD:
+                        status = "pass"
+                    elif coverage is not None:
+                        status = "fail"
+                    else:
+                        status = "error"
+                    
+                    # Get test counts from executor_output (handle None values from old runs)
+                    passed = executor_output.get("passed_tests") or 0
+                    failed_tests = executor_output.get("failed_tests") or []
+                    failed = len(failed_tests) if isinstance(failed_tests, list) else 0
+                    total = executor_output.get("total_tests") or 0
+                    
                     runs.append({
                         "run_id": data.get("run_id"),
                         "start_time": data.get("start_time"),
                         "end_time": data.get("end_time"),
-                        "status": data.get("executor_output", {}).get("status"),
-                        "coverage": data.get("executor_output", {}).get("coverage_percent"),
-                        "passed": data.get("executor_output", {}).get("passed_tests", 0),
-                        "failed": len(data.get("executor_output", {}).get("failed_tests", [])),
-                        "total": data.get("executor_output", {}).get("total_tests", 0)
+                        "status": status,
+                        "coverage": coverage,
+                        "passed": passed,
+                        "failed": failed,
+                        "total": total
                     })
             except Exception:
                 continue
@@ -290,3 +312,4 @@ if __name__ == "__main__":
     print("🚀 Starting Dashboard Server...")
     print("📊 Dashboard: http://localhost:8081")
     uvicorn.run(app, host="0.0.0.0", port=8081)
+

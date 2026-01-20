@@ -272,24 +272,24 @@ class StreamingOrchestrator:
             
             yield self._format_sse(self.emit("log", "healer", "Checking for coverage gaps..."))
             
-            executor_output = healing_agent(
+            healer_output = healing_agent(
                 planner_output=planner_output,
                 executor_output=executor_output,
                 failure_analysis=failure_analysis
             )
             
-            pipeline_state["executor_output"] = executor_output
-            healing_results = executor_output.get("healing_results", {})
-            recommendations = healing_results.get("recommendations", [])
+            # Store healer output separately - don't overwrite executor_output
+            pipeline_state["healer_output"] = healer_output
+            recommendations = healer_output.get("modules_needing_tests", [])
             
             if recommendations:
-                yield self._format_sse(self.emit("log", "healer", f"Found {len(recommendations)} file(s) with gaps"))
+                yield self._format_sse(self.emit("log", "healer", f"Found {len(recommendations)} module(s) with gaps"))
             
             yield self._format_sse(self.emit(
                 "stage_complete",
                 "healer",
                 "Analysis complete",
-                data=healing_results
+                data=healer_output
             ))
         else:
             yield self._format_sse(self.emit("log", None, "Coverage threshold satisfied — agents idle"))
@@ -299,21 +299,33 @@ class StreamingOrchestrator:
         await asyncio.sleep(0.3)
         
         # ─────────────────────────────────────────
-        # 5️⃣ FINAL STATUS
+        # 5️⃣ FINAL STATUS (based on coverage threshold)
         # ─────────────────────────────────────────
         passed_count = executor_output.get("passed_tests", 0) if executor_output else 0
         failed_count = len(executor_output.get("failed_tests", [])) if executor_output else 0
         total_count = executor_output.get("total_tests", 0) if executor_output else 0
         
+        # Determine final status based on coverage threshold
+        if coverage is not None and coverage >= COVERAGE_THRESHOLD:
+            final_status = "pass"
+            status_message = "CI PASSED"
+        elif coverage is not None:
+            final_status = "fail"
+            status_message = "CI FAILED"
+        else:
+            final_status = "error"
+            status_message = "CI ERROR"
+        
         yield self._format_sse(self.emit(
             "summary",
-            message="CI PASSED" if status == "pass" else "CI FAILED" if status == "fail" else "CI ERROR",
+            message=status_message,
             data={
-                "status": status,
+                "status": final_status,
                 "passed": passed_count,
                 "failed": failed_count,
                 "total": total_count,
-                "coverage": coverage
+                "coverage": coverage,
+                "coverage_threshold": COVERAGE_THRESHOLD
             }
         ))
         
@@ -334,8 +346,11 @@ class StreamingOrchestrator:
         metrics = {
             "run_id": self.run_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "status": status,
+            "status": final_status,
             "coverage": coverage,
+            "passed_tests": passed_count,
+            "failed_tests": failed_count,
+            "total_tests": total_count,
             "execution_time_ms": executor_output.get("execution_time_ms", 0) if executor_output else 0
         }
         
@@ -347,4 +362,5 @@ class StreamingOrchestrator:
     def _format_sse(self, event: dict) -> str:
         """Format event as SSE data line."""
         return f"data: {json.dumps(event)}\n\n"
+
 

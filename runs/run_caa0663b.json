@@ -1,0 +1,123 @@
+{
+  "run_id": "run_caa0663b",
+  "planner_output": {
+    "modules_to_test": [
+      "payments"
+    ],
+    "test_types": [
+      "unit"
+    ],
+    "risk_level": "medium",
+    "reason": "medium severity issue affecting ['payments']"
+  },
+  "tester_output": {
+    "test_files_created": [
+      "tests/test_payments_auto.py"
+    ],
+    "num_tests_generated": 15
+  },
+  "executor_output": {
+    "status": "fail",
+    "total_tests": 15,
+    "passed_tests": 13,
+    "failed_tests": [],
+    "failed_test_files": [],
+    "coverage_percent": 85.60606060606061,
+    "uncovered_files": {
+      "src/payments.py": [
+        57,
+        58,
+        73,
+        74,
+        75,
+        76,
+        77,
+        80,
+        136,
+        167,
+        168,
+        169,
+        187,
+        188,
+        198,
+        199,
+        200,
+        204,
+        205
+      ]
+    },
+    "logs": "============================= test session starts ==============================\nplatform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0\nrootdir: /home/brahmanya/autonomous-llm-devops-agent\nplugins: metadata-3.1.1, anyio-4.11.0, mock-3.15.1, json-report-1.5.0, langsmith-0.4.41, cov-7.0.0\ncollected 15 items\n\ntests/test_payments_auto.py ...........EE..                              [100%]\n\n==================================== ERRORS ====================================\n____________ ERROR at setup of test_service_process_payment_success ____________\nfile /home/brahmanya/autonomous-llm-devops-agent/tests/test_payments_auto.py, line 143\n  def test_service_process_payment_success(mock_repo, mock_gateway_success, mock_fraud_no_fraud):\nE       fixture 'mock_gateway_success' not found\n>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, class_mocker, clean_repo, cov, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, include_metadata_in_junit_xml, json_metadata, metadata, mock_fraud_is_fraud, mock_fraud_no_fraud, mock_repo, mocker, module_mocker, monkeypatch, no_cover, package_mocker, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, session_mocker, subtests, tmp_path, tmp_path_factory, tmp_payment_repo_path, tmpdir, tmpdir_factory\n>       use 'pytest --fixtures [testpath]' for help on them.\n\n/home/brahmanya/autonomous-llm-devops-agent/tests/test_payments_auto.py:143\n_______ ERROR at setup of test_service_process_payment_fraud_check_fails _______\nfile /home/brahmanya/autonomous-llm-devops-agent/tests/test_payments_auto.py, line 154\n  def test_service_process_payment_fraud_check_fails(mock_repo, mock_gateway_success, mock_fraud_is_fraud):\nE       fixture 'mock_gateway_success' not found\n>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, class_mocker, clean_repo, cov, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, include_metadata_in_junit_xml, json_metadata, metadata, mock_fraud_is_fraud, mock_fraud_no_fraud, mock_repo, mocker, module_mocker, monkeypatch, no_cover, package_mocker, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, session_mocker, subtests, tmp_path, tmp_path_factory, tmp_payment_repo_path, tmpdir, tmpdir_factory\n>       use 'pytest --fixtures [testpath]' for help on them.\n\n/home/brahmanya/autonomous-llm-devops-agent/tests/test_payments_auto.py:154\n=========================== short test summary info ============================\nERROR tests/test_payments_auto.py::test_service_process_payment_success\nERROR tests/test_payments_auto.py::test_service_process_payment_fraud_check_fails\n========================= 13 passed, 2 errors in 0.22s =========================\n",
+    "summary_report": "\u274c 0 failed, 13 passed (Total: 15)",
+    "execution_time_ms": 3992
+  },
+  "failure_analysis": {
+    "failure_type": "coverage_gap",
+    "reason": "Coverage below threshold (85.60606060606061%)",
+    "next_step": "regenerate_tests_for_coverage",
+    "confidence": "high",
+    "coverage_percent": 85.60606060606061,
+    "uncovered_lines": []
+  },
+  "start_time": "2026-01-20T22:50:31.537545+00:00",
+  "end_time": "2026-01-20T22:51:16.755720+00:00",
+  "healer_output": {
+    "needs_healing": true,
+    "coverage_percent": 85.60606060606061,
+    "coverage_threshold": 98,
+    "coverage_gap": 12.39,
+    "uncovered_files": {
+      "src/payments.py": [
+        57,
+        58,
+        73,
+        74,
+        75,
+        76,
+        77,
+        80,
+        136,
+        167,
+        168,
+        169,
+        187,
+        188,
+        198,
+        199,
+        200,
+        204,
+        205
+      ]
+    },
+    "coverage_context": {
+      "payments": {
+        "uncovered_lines": [
+          57,
+          58,
+          73,
+          74,
+          75,
+          76,
+          77,
+          80,
+          136,
+          167,
+          168,
+          169,
+          187,
+          188,
+          198,
+          199,
+          200,
+          204,
+          205
+        ],
+        "line_count": 19
+      }
+    },
+    "dead_code_candidates": [],
+    "modules_needing_tests": [
+      "payments"
+    ],
+    "recommendation": "Generate targeted tests for 19 uncovered lines across 1 module(s)."
+  }
+}
