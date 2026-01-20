@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+
 <body>
     <!-- Header -->
     <header class="header">
@@ -17,6 +19,12 @@
                 <h1>Autonomous Testing Dashboard</h1>
             </div>
             <div class="header-actions">
+                <button class="btn-coverage" id="runCoverageBtn" onclick="runCoverage()">
+                    <span class="coverage-icon">📊</span> Run Coverage
+                </button>
+                <button class="btn-run" id="runPipelineBtn" onclick="startPipeline()">
+                    <span class="run-icon">▶</span> Run Pipeline
+                </button>
                 <button class="btn-refresh" onclick="refreshData()">
                     <span class="refresh-icon">🔄</span> Refresh
                 </button>
@@ -28,8 +36,147 @@
         </div>
     </header>
 
+    <!-- Coverage Result Panel (hidden by default) -->
+    <section class="coverage-panel" id="coveragePanel" style="display: none;">
+        <div class="coverage-panel-header">
+            <h3>📊 Coverage Results</h3>
+            <button class="btn-close" onclick="closeCoveragePanel()">×</button>
+        </div>
+        <div class="coverage-panel-content">
+            <div class="coverage-stats-row">
+                <div class="coverage-stat">
+                    <span class="coverage-stat-value" id="covPercent">--</span>
+                    <span class="coverage-stat-label">Coverage %</span>
+                </div>
+                <div class="coverage-stat">
+                    <span class="coverage-stat-value" id="covPassed">--</span>
+                    <span class="coverage-stat-label">Passed</span>
+                </div>
+                <div class="coverage-stat">
+                    <span class="coverage-stat-value" id="covFailed">--</span>
+                    <span class="coverage-stat-label">Failed</span>
+                </div>
+                <div class="coverage-stat">
+                    <span class="coverage-stat-value" id="covTotal">--</span>
+                    <span class="coverage-stat-label">Total</span>
+                </div>
+            </div>
+            <div class="uncovered-section" id="uncoveredSection" style="display: none;">
+                <h4>⚠️ Uncovered Files</h4>
+                <div class="uncovered-list" id="uncoveredList"></div>
+            </div>
+            <div class="coverage-output" id="coverageOutput"></div>
+        </div>
+    </section>
+
     <!-- Main Dashboard -->
     <main class="dashboard">
+        <!-- Live Execution Panel (hidden by default) -->
+        <section class="live-panel" id="livePanel" style="display: none;">
+            <div class="live-header">
+                <div class="live-title">
+                    <span class="live-icon">▶</span>
+                    <h2>Autonomous CI Pipeline</h2>
+                    <span class="live-badge">LIVE</span>
+                </div>
+                <div class="live-meta">
+                    <span class="meta-item">Run ID: <code id="liveRunId">--</code></span>
+                    <span class="meta-item">Commit: <code id="liveCommit">--</code></span>
+                </div>
+            </div>
+
+            <div class="live-content">
+                <!-- Pipeline Stages -->
+                <div class="pipeline-stages">
+                    <div class="stage-card" id="stagePlanner" data-state="waiting">
+                        <div class="stage-header">
+                            <span class="stage-icon">🎯</span>
+                            <span class="stage-name">Planner Agent</span>
+                            <span class="stage-badge">WAITING</span>
+                        </div>
+                        <div class="stage-progress">
+                            <div class="progress-bar"></div>
+                        </div>
+                        <div class="stage-message">--</div>
+                    </div>
+
+                    <div class="stage-card" id="stageTester" data-state="waiting">
+                        <div class="stage-header">
+                            <span class="stage-icon">🧪</span>
+                            <span class="stage-name">Tester Agent</span>
+                            <span class="stage-badge">WAITING</span>
+                        </div>
+                        <div class="stage-progress">
+                            <div class="progress-bar"></div>
+                        </div>
+                        <div class="stage-message">--</div>
+                    </div>
+
+                    <div class="stage-card" id="stageExecutor" data-state="waiting">
+                        <div class="stage-header">
+                            <span class="stage-icon">⚙️</span>
+                            <span class="stage-name">Executor Agent</span>
+                            <span class="stage-badge">WAITING</span>
+                        </div>
+                        <div class="stage-progress">
+                            <div class="progress-bar"></div>
+                        </div>
+                        <div class="stage-message">--</div>
+                    </div>
+
+                    <div class="stage-card" id="stageHealer" data-state="waiting">
+                        <div class="stage-header">
+                            <span class="stage-icon">🩹</span>
+                            <span class="stage-name">Healer Agent</span>
+                            <span class="stage-badge">WAITING</span>
+                        </div>
+                        <div class="stage-progress">
+                            <div class="progress-bar"></div>
+                        </div>
+                        <div class="stage-message">--</div>
+                    </div>
+                </div>
+
+                <!-- Live Logs -->
+                <div class="live-logs">
+                    <div class="logs-header">
+                        <span>📋 Live Logs</span>
+                        <span class="log-count" id="logCount">0 entries</span>
+                    </div>
+                    <div class="logs-terminal" id="logsTerminal"></div>
+                </div>
+            </div>
+
+            <!-- Summary Card (shown on completion) -->
+            <div class="live-summary" id="liveSummary" style="display: none;">
+                <div class="summary-status" id="summaryStatus">
+                    <span class="summary-icon">✔</span>
+                    <span class="summary-text">CI PASSED</span>
+                </div>
+                <div class="summary-stats">
+                    <div class="summary-stat">
+                        <span class="stat-num" id="summaryPassed">0</span>
+                        <span class="stat-label">Passed</span>
+                    </div>
+                    <div class="summary-stat">
+                        <span class="stat-num" id="summaryFailed">0</span>
+                        <span class="stat-label">Failed</span>
+                    </div>
+                    <div class="summary-stat coverage-ring">
+                        <svg viewBox="0 0 36 36" class="coverage-svg">
+                            <path class="coverage-bg"
+                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            <path class="coverage-fill" id="coverageRing" stroke-dasharray="0, 100"
+                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                        </svg>
+                        <span class="stat-num" id="summaryCoverage">0%</span>
+                        <span class="stat-label">Coverage</span>
+                    </div>
+                </div>
+                <button class="btn-close-live" onclick="closeLivePanel()">View Dashboard</button>
+            </div>
+        </section>
+
         <!-- Stats Cards Row -->
         <section class="stats-row">
             <div class="stat-card stat-runs">
@@ -100,7 +247,7 @@
                         <span id="latestTests">--</span>
                     </div>
                 </div>
-                
+
                 <!-- Agent Steps -->
                 <div class="agent-steps">
                     <h4>Agent Pipeline</h4>
@@ -158,7 +305,9 @@
                         </tr>
                     </thead>
                     <tbody id="runsTableBody">
-                        <tr><td colspan="6" class="loading">Loading runs...</td></tr>
+                        <tr>
+                            <td colspan="6" class="loading">Loading runs...</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -172,4 +321,5 @@
 
     <script src="/static/app.js"></script>
 </body>
+
 </html>

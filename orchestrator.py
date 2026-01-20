@@ -2,7 +2,7 @@ from agents.planner import planner_agent
 from agents.tester import tester_agent
 from agents.executor import executor_agent
 from agents.failure_analysis import failure_analysis_agent
-from agents.healer import healing_hook
+from agents.healer import healing_agent
 from datetime import datetime, timezone
 import json
 import os
@@ -131,18 +131,26 @@ def run_pipeline(repo_event: dict) -> dict:
         if coverage is not None:
             log_info(f"Coverage after tester: {coverage:.2f}%")
 
-        # 4c️⃣ COVERAGE HEALING
-        if (
-            ENABLE_COVERAGE_HEALING
-            and status == "pass"
-            and coverage is not None
-            and coverage < COVERAGE_THRESHOLD
-        ):
-            log_warn(f"Coverage healing triggered ({coverage:.2f}%)")
+        # 4c️⃣ FAILURE ANALYSIS (run before healing)
+        failure_analysis = None
+        if status in ("fail", "error"):
+            log_step("Failure Analysis")
+            failure_analysis = failure_analysis_agent(executor_output)
+            pipeline_state["failure_analysis"] = failure_analysis
+            log_error(f"Failure type: {failure_analysis.get('failure_type')}")
+            log_info(f"Next action : {failure_analysis.get('next_step')}")
 
-            executor_output = healing_hook(
+        # 4d️⃣ ENHANCED HEALING
+        if ENABLE_COVERAGE_HEALING and (
+            (status == "pass" and coverage is not None and coverage < COVERAGE_THRESHOLD)
+            or (status == "fail" and failure_analysis and failure_analysis.get("failure_type") == "test_bug")
+        ):
+            log_warn(f"Enhanced healing triggered")
+
+            executor_output = healing_agent(
                 planner_output=planner_output,
-                executor_output=executor_output
+                executor_output=executor_output,
+                failure_analysis=failure_analysis
             )
 
             pipeline_state["executor_output"] = executor_output
@@ -153,18 +161,6 @@ def run_pipeline(repo_event: dict) -> dict:
                 log_info(f"Coverage after healing: {coverage:.2f}%")
     else:
         log_success("Coverage threshold satisfied — agents idle")
-
-    # ─────────────────────────────────────────
-    # 5️⃣ FAILURE ANALYSIS
-    # ─────────────────────────────────────────
-    if status in ("fail", "error"):
-        log_step("Failure Analysis")
-
-        failure_analysis = failure_analysis_agent(executor_output)
-        pipeline_state["failure_analysis"] = failure_analysis
-
-        log_error(f"Failure type: {failure_analysis.get('failure_type')}")
-        log_info(f"Next action : {failure_analysis.get('next_step')}")
 
     # ─────────────────────────────────────────
     # 6️⃣ FINAL STATUS

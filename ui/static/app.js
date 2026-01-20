@@ -23,6 +23,89 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ─────────────────────────────────────────────
+// COVERAGE RUNNER
+// ─────────────────────────────────────────────
+async function runCoverage() {
+    const btn = document.getElementById('runCoverageBtn');
+    const panel = document.getElementById('coveragePanel');
+
+    // Disable button and show running state
+    btn.disabled = true;
+    btn.innerHTML = '<span class="coverage-icon">⏳</span> Running...';
+
+    // Show panel
+    panel.style.display = 'block';
+    document.getElementById('covPercent').textContent = '...';
+    document.getElementById('covPassed').textContent = '...';
+    document.getElementById('covFailed').textContent = '...';
+    document.getElementById('covTotal').textContent = '...';
+    document.getElementById('coverageOutput').textContent = 'Running pytest with coverage...';
+    document.getElementById('uncoveredSection').style.display = 'none';
+
+    try {
+        const response = await fetch('/api/coverage/run', { method: 'POST' });
+        const data = await response.json();
+
+        if (data.success) {
+            // Update stats
+            document.getElementById('covPercent').textContent =
+                data.coverage_percent != null ? `${data.coverage_percent.toFixed(1)}%` : '--';
+            document.getElementById('covPassed').textContent = data.passed || 0;
+            document.getElementById('covFailed').textContent = data.failed || 0;
+            document.getElementById('covTotal').textContent = data.total || 0;
+
+            // Show uncovered files if any
+            const uncoveredFiles = data.uncovered_files || {};
+            const uncoveredCount = Object.keys(uncoveredFiles).length;
+
+            if (uncoveredCount > 0) {
+                document.getElementById('uncoveredSection').style.display = 'block';
+                let uncoveredHtml = '';
+                for (const [file, lines] of Object.entries(uncoveredFiles)) {
+                    const fileName = file.split('/').pop();
+                    uncoveredHtml += `<div class="uncovered-item">
+                        <span class="uncovered-file">${fileName}</span>
+                        <span class="uncovered-lines">${lines.length} lines</span>
+                    </div>`;
+                }
+                document.getElementById('uncoveredList').innerHTML = uncoveredHtml;
+            }
+
+            // Status message
+            const status = data.returncode === 0 ? '✅ All tests passed!' : `⚠️ ${data.failed} test(s) failed`;
+            document.getElementById('coverageOutput').innerHTML = `
+                <div class="coverage-status ${data.returncode === 0 ? 'success' : 'warning'}">
+                    ${status}
+                </div>
+                <div class="coverage-hint">
+                    ${data.coverage_percent < 98 ? '💡 Coverage below 98% - Healer Agent will activate when you run the pipeline!' : '✨ Coverage meets threshold!'}
+                </div>
+            `;
+        } else {
+            document.getElementById('coverageOutput').innerHTML = `
+                <div class="coverage-status error">
+                    ❌ Error: ${data.error || 'Failed to run coverage'}
+                </div>
+            `;
+        }
+    } catch (error) {
+        document.getElementById('coverageOutput').innerHTML = `
+            <div class="coverage-status error">
+                ❌ Error: ${error.message}
+            </div>
+        `;
+    }
+
+    // Re-enable button
+    btn.disabled = false;
+    btn.innerHTML = '<span class="coverage-icon">📊</span> Run Coverage';
+}
+
+function closeCoveragePanel() {
+    document.getElementById('coveragePanel').style.display = 'none';
+}
+
+// ─────────────────────────────────────────────
 // DATA FETCHING
 // ─────────────────────────────────────────────
 async function refreshData() {
@@ -312,4 +395,273 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// ─────────────────────────────────────────────
+// LIVE PIPELINE EXECUTION
+// ─────────────────────────────────────────────
+let eventSource = null;
+let logCount = 0;
+
+function startPipeline() {
+    const btn = document.getElementById('runPipelineBtn');
+    const livePanel = document.getElementById('livePanel');
+
+    // Disable button and show running state
+    btn.disabled = true;
+    btn.classList.add('running');
+    btn.innerHTML = '<span class="run-icon">⏳</span> Running...';
+
+    // Reset and show live panel
+    resetLivePanel();
+    livePanel.style.display = 'block';
+    livePanel.scrollIntoView({ behavior: 'smooth' });
+
+    // Start SSE connection
+    eventSource = new EventSource('/api/run/stream');
+
+    eventSource.onmessage = function (e) {
+        try {
+            const event = JSON.parse(e.data);
+            handleSSEEvent(event);
+        } catch (err) {
+            console.error('Failed to parse SSE event:', err);
+        }
+    };
+
+    eventSource.onerror = function (e) {
+        console.error('SSE connection error:', e);
+        eventSource.close();
+        btn.disabled = false;
+        btn.classList.remove('running');
+        btn.innerHTML = '<span class="run-icon">▶</span> Run Pipeline';
+    };
+}
+
+function handleSSEEvent(event) {
+    const type = event.type;
+    const stage = event.stage;
+    const message = event.message;
+    const data = event.data || {};
+
+    // Add to logs
+    addLogEntry(event);
+
+    switch (type) {
+        case 'pipeline_start':
+            document.getElementById('liveRunId').textContent = data.run_id || '--';
+            document.getElementById('liveCommit').textContent = data.commit || '--';
+            break;
+
+        case 'stage_start':
+            setStageState(stage, 'active', message);
+            break;
+
+        case 'stage_complete':
+            setStageState(stage, 'completed', message);
+            break;
+
+        case 'stage_skip':
+            setStageState(stage, 'skipped', message || 'Skipped');
+            break;
+
+        case 'log':
+            // Already added to logs above
+            break;
+
+        case 'coverage_report':
+            // Display coverage details
+            showCoverageDetails(data);
+            break;
+
+        case 'summary':
+            showSummary(data, message);
+            finishPipeline();
+            break;
+
+        case 'pipeline_complete':
+            if (eventSource) {
+                eventSource.close();
+            }
+            refreshData(); // Refresh dashboard data
+            break;
+    }
+}
+
+function setStageState(stageName, state, message) {
+    const stageMap = {
+        'planner': 'stagePlanner',
+        'tester': 'stageTester',
+        'executor': 'stageExecutor',
+        'healer': 'stageHealer'
+    };
+
+    const stageId = stageMap[stageName];
+    if (!stageId) return;
+
+    const stageEl = document.getElementById(stageId);
+    stageEl.setAttribute('data-state', state);
+
+    // Update badge
+    const badge = stageEl.querySelector('.stage-badge');
+    const stateLabels = {
+        'waiting': 'WAITING',
+        'active': 'RUNNING',
+        'completed': 'COMPLETED',
+        'skipped': 'SKIPPED',
+        'error': 'ERROR'
+    };
+    badge.textContent = stateLabels[state] || state.toUpperCase();
+
+    // Update message
+    if (message) {
+        stageEl.querySelector('.stage-message').textContent = message;
+    }
+}
+
+function addLogEntry(event) {
+    const terminal = document.getElementById('logsTerminal');
+    const timestamp = new Date(event.timestamp).toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+
+    const stageTag = event.stage ? `[${event.stage.toUpperCase()}]` : '[SYSTEM]';
+    const message = event.message || event.type;
+
+    const entryClass = event.type === 'stage_complete' ? 'info' : '';
+
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${entryClass}`;
+    entry.innerHTML = `
+        <span class="timestamp">${timestamp}</span>
+        <span class="stage-tag">${stageTag}</span>
+        <span class="message">${escapeHtml(message)}</span>
+    `;
+
+    terminal.appendChild(entry);
+    terminal.scrollTop = terminal.scrollHeight;
+
+    logCount++;
+    document.getElementById('logCount').textContent = `${logCount} entries`;
+}
+
+function showSummary(data, message) {
+    const summaryEl = document.getElementById('liveSummary');
+    const statusEl = document.getElementById('summaryStatus');
+
+    const isPassed = data.status === 'pass';
+
+    summaryEl.classList.toggle('failed', !isPassed);
+    statusEl.querySelector('.summary-icon').textContent = isPassed ? '✔' : '✖';
+    statusEl.querySelector('.summary-text').textContent = message || (isPassed ? 'CI PASSED' : 'CI FAILED');
+
+    document.getElementById('summaryPassed').textContent = data.passed || 0;
+    document.getElementById('summaryFailed').textContent = data.failed || 0;
+
+    const coverage = data.coverage || 0;
+    document.getElementById('summaryCoverage').textContent = `${coverage.toFixed(1)}%`;
+
+    // Animate coverage ring with color based on threshold
+    const ring = document.getElementById('coverageRing');
+
+    // Remove existing color classes
+    ring.classList.remove('high', 'medium', 'low');
+
+    // Add color class based on coverage level
+    if (coverage >= 80) {
+        ring.classList.add('high');  // Green
+    } else if (coverage >= 50) {
+        ring.classList.add('medium');  // Yellow
+    } else {
+        ring.classList.add('low');  // Red
+    }
+
+    // Animate the ring fill
+    ring.style.strokeDasharray = `${coverage}, 100`;
+
+    summaryEl.style.display = 'block';
+}
+
+function finishPipeline() {
+    const btn = document.getElementById('runPipelineBtn');
+    btn.disabled = false;
+    btn.classList.remove('running');
+    btn.innerHTML = '<span class="run-icon">▶</span> Run Pipeline';
+}
+
+function resetLivePanel() {
+    // Reset stages
+    ['stagePlanner', 'stageTester', 'stageExecutor', 'stageHealer'].forEach(id => {
+        const el = document.getElementById(id);
+        el.setAttribute('data-state', 'waiting');
+        el.querySelector('.stage-badge').textContent = 'WAITING';
+        el.querySelector('.stage-message').textContent = '--';
+    });
+
+    // Reset logs
+    document.getElementById('logsTerminal').innerHTML = '';
+    logCount = 0;
+    document.getElementById('logCount').textContent = '0 entries';
+
+    // Reset meta
+    document.getElementById('liveRunId').textContent = '--';
+    document.getElementById('liveCommit').textContent = '--';
+
+    // Hide summary
+    document.getElementById('liveSummary').style.display = 'none';
+}
+
+function closeLivePanel() {
+    document.getElementById('livePanel').style.display = 'none';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ─────────────────────────────────────────────
+// COVERAGE DETAILS DISPLAY
+// ─────────────────────────────────────────────
+function showCoverageDetails(data) {
+    const terminal = document.getElementById('logsTerminal');
+    const coverage = data.coverage_percent || 0;
+    const threshold = data.threshold || 98;
+    const meetsThreshold = data.meets_threshold || false;
+    const uncoveredFiles = data.uncovered_files || {};
+
+    // Create coverage summary entry
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${meetsThreshold ? 'success' : 'warning'}`;
+
+    const statusIcon = meetsThreshold ? '✅' : '⚠️';
+    const statusText = meetsThreshold ? 'meets threshold' : `below ${threshold}% threshold`;
+
+    let html = `
+        <div class="coverage-report">
+            <div class="coverage-header">
+                ${statusIcon} <strong>Coverage: ${coverage.toFixed(2)}%</strong> (${statusText})
+            </div>
+    `;
+
+    // Show uncovered files if any
+    const uncoveredCount = Object.keys(uncoveredFiles).length;
+    if (uncoveredCount > 0) {
+        html += `<div class="uncovered-files">`;
+        html += `<div class="uncovered-header">📂 ${uncoveredCount} file(s) with uncovered lines:</div>`;
+
+        for (const [file, lines] of Object.entries(uncoveredFiles)) {
+            const fileName = file.split('/').pop();
+            const lineCount = Array.isArray(lines) ? lines.length : 0;
+            html += `<div class="uncovered-file">
+                <span class="file-name">${escapeHtml(fileName)}</span>
+                <span class="line-count">${lineCount} line(s) uncovered</span>
+            </div>`;
+        }
+        html += `</div>`;
+    }
+
+    html += `</div>`;
+    entry.innerHTML = html;
+
+    terminal.appendChild(entry);
+    terminal.scrollTop = terminal.scrollHeight;
 }
