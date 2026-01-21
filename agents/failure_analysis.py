@@ -1,12 +1,15 @@
 import os
+import sys
 import json
 from typing import Dict, List
 from dotenv import load_dotenv
 from google import genai
 
-load_dotenv()
+# Import from centralized config
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import COVERAGE_THRESHOLD, GEMINI_MODEL
 
-GEMINI_MODEL = "models/gemini-2.5-flash"
+load_dotenv()
 
 
 def get_gemini_client() -> genai.Client:
@@ -101,7 +104,7 @@ def failure_analysis_agent(executor_output: dict) -> dict:
     # --------------------------------------------------
     # 2️⃣ Coverage gate failure
     # --------------------------------------------------
-    if coverage is not None and coverage < 98:
+    if coverage is not None and coverage < COVERAGE_THRESHOLD:
         return {
             "failure_type": "coverage_gap",
             "reason": f"Coverage below threshold ({coverage}%)",
