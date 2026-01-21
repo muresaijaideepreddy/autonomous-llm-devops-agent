@@ -193,14 +193,20 @@ class StreamingOrchestrator:
             yield self._format_sse(self.emit("stage_start", "tester", "Generating new tests"))
             await asyncio.sleep(0.2)
             
-            tester_output = tester_agent(planner_output)
+            # Pass executor_output so tester knows which tests passed/failed
+            tester_plan = {
+                **planner_output,
+                "executor_output": executor_output  # For smart test preservation
+            }
+            tester_output = tester_agent(tester_plan)
             pipeline_state["tester_output"] = tester_output
             
             num_tests = tester_output.get("num_tests_generated", 0)
+            tests_preserved = tester_output.get("tests_preserved", 0)
             yield self._format_sse(self.emit(
                 "stage_complete",
                 "tester",
-                f"Generated {num_tests} test(s)",
+                f"Generated {num_tests} test(s) ({tests_preserved} preserved)",
                 data=tester_output
             ))
             await asyncio.sleep(0.3)

@@ -251,33 +251,5 @@ def healing_agent(
     return report
 
 
-# -----------------------------
-# LEGACY HOOK (Backward Compatibility)
-# -----------------------------
 
-def healing_hook(planner_output: dict, executor_output: dict) -> dict:
-    """Legacy compatibility wrapper."""
-    return healing_agent(
-        planner_output=planner_output,
-        executor_output=executor_output
-    )
-
-
-# -----------------------------
-# STANDALONE TEST
-# -----------------------------
-
-if __name__ == "__main__":
-    sample_executor = {
-        "status": "pass",
-        "coverage_percent": 85.5
-    }
-    
-    report = healing_agent(
-        planner_output={},
-        executor_output=sample_executor
-    )
-    
-    print("\n📊 Full Report:")
-    print(json.dumps(report, indent=2))
 

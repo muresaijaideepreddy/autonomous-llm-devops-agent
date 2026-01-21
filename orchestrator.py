@@ -110,7 +110,12 @@ def run_pipeline(repo_event: dict) -> dict:
 
         # 4a️⃣ TESTER
         log_step("Tester Agent")
-        tester_output = tester_agent(planner_output)
+        # Pass executor_output so tester knows which tests passed/failed
+        tester_plan = {
+            **planner_output,
+            "executor_output": executor_output  # For smart test preservation
+        }
+        tester_output = tester_agent(tester_plan)
         pipeline_state["tester_output"] = tester_output
 
         # 4b️⃣ EXECUTOR (NEW TESTS)
@@ -156,7 +161,8 @@ def run_pipeline(repo_event: dict) -> dict:
                 targeted_plan = {
                     "modules_to_test": healer_report.get("modules_needing_tests", []),
                     "risk_level": planner_output.get("risk_level", "medium"),
-                    "coverage_context": healer_report.get("coverage_context")
+                    "coverage_context": healer_report.get("coverage_context"),
+                    "executor_output": executor_output  # For smart test preservation
                 }
                 
                 tester_output = tester_agent(targeted_plan)
