@@ -66,12 +66,12 @@ def planner_agent(repo_event: dict) -> dict:
     test_types = ["unit"]
     risk_level = "low"
 
-    # Module detection
+    # Module detection - Dynamic (scans any src/*.py file)
     for file in changed_files:
-        if "payments" in file:
-            modules_to_test.append("payments")
-        elif "auth" in file:
-            modules_to_test.append("auth")
+        if file.startswith("src/") and file.endswith(".py"):
+            module_name = file[4:-3]  # Extract "payments" from "src/payments.py"
+            if module_name not in modules_to_test:
+                modules_to_test.append(module_name)
 
     # Severity decision
     if "severity" in issue:
