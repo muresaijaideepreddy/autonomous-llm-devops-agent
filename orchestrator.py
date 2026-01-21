@@ -8,12 +8,8 @@ import json
 import os
 import uuid
 
-# ─────────────────────────────────────────────
-# CONFIG
-# ─────────────────────────────────────────────
-COVERAGE_THRESHOLD = 98
-ENABLE_COVERAGE_HEALING = True
-TEST_DIR = "tests"
+# Import from centralized config
+from config import COVERAGE_THRESHOLD, TEST_DIR, ENABLE_COVERAGE_HEALING
 
 # ─────────────────────────────────────────────
 # CI‑STYLE LOGGING HELPERS
@@ -247,3 +243,4 @@ if __name__ == "__main__":
     }
 
     run_pipeline(repo_event)
+

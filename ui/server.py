@@ -90,8 +90,10 @@ async def stream_pipeline(commit_id: str = "manual_run"):
 # API ENDPOINTS
 # -----------------------------
 
-# Coverage threshold for pass/fail determination
-COVERAGE_THRESHOLD = 98
+# Import from centralized config
+import sys
+sys.path.insert(0, str(PROJECT_ROOT))
+from config import COVERAGE_THRESHOLD
 
 
 @app.get("/api/runs")

@@ -23,12 +23,8 @@ from agents.executor import executor_agent
 from agents.failure_analysis import failure_analysis_agent
 from agents.healer import healing_agent
 
-# ─────────────────────────────────────────────
-# CONFIG
-# ─────────────────────────────────────────────
-COVERAGE_THRESHOLD = 98
-ENABLE_COVERAGE_HEALING = True
-TEST_DIR = "tests"
+# Import from centralized config
+from config import COVERAGE_THRESHOLD, TEST_DIR, ENABLE_COVERAGE_HEALING
 
 
 class StreamingOrchestrator:

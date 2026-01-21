@@ -15,10 +15,14 @@ import json
 import os
 from typing import Dict, List, Optional
 
+# Import from centralized config
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import COVERAGE_THRESHOLD
+
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
-COVERAGE_THRESHOLD = 98
 COVERAGE_FILE = "coverage.json"
 
 # -----------------------------
@@ -57,6 +61,50 @@ def get_coverage_percent(coverage_file: str = COVERAGE_FILE) -> Optional[float]:
 
 
 # -----------------------------
+# FUNCTION NAME EXTRACTION
+# -----------------------------
+
+def get_uncovered_functions(coverage_file: str = COVERAGE_FILE) -> Dict[str, List[str]]:
+    """
+    Extract function names with 0% or low coverage.
+    Returns: {file_path: [function_names]}
+    """
+    if not os.path.exists(coverage_file):
+        return {}
+    
+    with open(coverage_file) as f:
+        coverage_data = json.load(f)
+    
+    uncovered_funcs = {}
+    
+    for file, data in coverage_data.get("files", {}).items():
+        functions = data.get("functions", {})
+        file_funcs = []
+        
+        for func_name, func_data in functions.items():
+            if not func_name:  # Skip empty function name (module level)
+                continue
+            summary = func_data.get("summary", {})
+            percent = summary.get("percent_covered", 100)
+            missing = summary.get("missing_lines", 0)
+            
+            # Include functions with <50% coverage or any missing lines
+            if percent < 50 or missing > 0:
+                file_funcs.append({
+                    "name": func_name,
+                    "coverage": percent,
+                    "missing_lines": missing
+                })
+        
+        if file_funcs:
+            # Sort by coverage (lowest first) to prioritize
+            file_funcs.sort(key=lambda x: x["coverage"])
+            uncovered_funcs[file] = file_funcs
+    
+    return uncovered_funcs
+
+
+# -----------------------------
 # DEAD CODE DETECTION
 # -----------------------------
 
@@ -90,17 +138,28 @@ def detect_dead_code(coverage_file: str = COVERAGE_FILE) -> List[dict]:
 # BUILD COVERAGE CONTEXT FOR TESTER
 # -----------------------------
 
-def build_coverage_context(uncovered: Dict[str, List[int]]) -> Dict[str, dict]:
+def build_coverage_context(
+    uncovered: Dict[str, List[int]],
+    uncovered_functions: Optional[Dict[str, List[dict]]] = None
+) -> Dict[str, dict]:
     """
     Build coverage context that Tester can use to generate targeted tests.
+    Now includes function names for better targeting.
     """
     coverage_context = {}
     
     for file_path, lines in uncovered.items():
         if file_path.startswith("src/") and file_path.endswith(".py"):
             module = file_path[4:-3]  # Remove "src/" and ".py"
+            
+            # Get function names for this file
+            func_list = []
+            if uncovered_functions and file_path in uncovered_functions:
+                func_list = [f["name"] for f in uncovered_functions[file_path]]
+            
             coverage_context[module] = {
                 "uncovered_lines": lines,
+                "uncovered_functions": func_list,
                 "line_count": len(lines)
             }
     
@@ -144,8 +203,11 @@ def healing_agent(
     # Analyze uncovered lines
     uncovered = get_uncovered_lines()
     
-    # Build context for Tester
-    coverage_context = build_coverage_context(uncovered)
+    # Get uncovered function names for targeted testing
+    uncovered_functions = get_uncovered_functions()
+    
+    # Build context for Tester (now includes function names)
+    coverage_context = build_coverage_context(uncovered, uncovered_functions)
     
     # Detect dead code
     dead_code = detect_dead_code()
@@ -218,3 +280,4 @@ if __name__ == "__main__":
     
     print("\n📊 Full Report:")
     print(json.dumps(report, indent=2))
+

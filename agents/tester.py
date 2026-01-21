@@ -57,6 +57,22 @@ def test_{module}_fallback():
     assert True
 """
 
+def get_existing_test_names(test_file_path: str) -> List[str]:
+    """Extract existing test function names from a test file."""
+    if not os.path.exists(test_file_path):
+        return []
+    
+    try:
+        with open(test_file_path, "r") as f:
+            code = f.read()
+        tree = ast.parse(code)
+        return [
+            node.name for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name.startswith("test_")
+        ]
+    except (SyntaxError, FileNotFoundError):
+        return []
+
 # -----------------------------
 # LLM GENERATION
 # -----------------------------
@@ -66,35 +82,56 @@ def generate_tests_with_gemini(
     source_code: str,
     module: str,
     risk_level: str,
-    coverage_context: Optional[dict] = None
+    coverage_context: Optional[dict] = None,
+    existing_tests: Optional[List[str]] = None
 ) -> str:
     """
     Generate pytest tests using Gemini.
+    Now supports function-level targeting and duplicate avoidance.
     """
 
     max_tests = MAX_TESTS_BY_SEVERITY.get(risk_level, 2)
 
-    # ✅ MINIMAL ADDITION (coverage only)
+    # Build targeted coverage instruction
     coverage_instruction = ""
     if coverage_context:
+        uncovered_lines = coverage_context.get("uncovered_lines", [])
+        uncovered_funcs = coverage_context.get("uncovered_functions", [])
+        
         coverage_instruction = f"""
-IMPORTANT:
-These lines are NOT covered by tests:
-{coverage_context}
+PRIORITY - TARGET THESE UNCOVERED ITEMS:
+"""
+        if uncovered_funcs:
+            coverage_instruction += f"""
+These FUNCTIONS have low or no coverage - TEST THEM FIRST:
+{', '.join(uncovered_funcs)}
+"""
+        coverage_instruction += f"""
+These line numbers are NOT covered: {uncovered_lines[:20]}
 
-Generate pytest tests that EXECUTE ONLY these uncovered lines.
-Do NOT re-test happy paths.
-If uncovered code raises errors, assert the error.
+Generate pytest tests that EXECUTE these uncovered functions/lines.
+Focus on edge cases, error paths, and boundary conditions.
+"""
+
+    # Avoid duplicate test generation
+    existing_instruction = ""
+    if existing_tests:
+        existing_instruction = f"""
+IMPORTANT: These tests ALREADY EXIST - DO NOT regenerate them:
+{', '.join(existing_tests[:15])}
+
+Generate NEW tests that cover DIFFERENT code paths.
 """
 
     prompt = f"""
 You are a senior QA engineer.
 {coverage_instruction}
+{existing_instruction}
 
 Generate pytest unit tests for the following Python module.
 
 CRITICAL RULES (MUST FOLLOW):
-- Generate AT MOST {max_tests} test functions
+- Generate AT MOST {max_tests} NEW test functions
 - Use pytest
 - Keep code concise
 - Do NOT use parametrized tests
@@ -134,13 +171,13 @@ Code:
 
 def tester_agent(plan: Dict) -> Dict:
     """
-    Tester Agent
+    Tester Agent - Enhanced with test preservation and function targeting.
     """
 
     modules: List[str] = plan.get("modules_to_test", [])
     risk_level: str = plan.get("risk_level", "low")
 
-    # ✅ MINIMAL ADDITION
+    # Coverage context from Healer (now includes function names)
     coverage_context: Optional[dict] = plan.get("coverage_context")
 
     os.makedirs("tests", exist_ok=True)
@@ -157,17 +194,34 @@ def tester_agent(plan: Dict) -> Dict:
         with open(source_path, "r") as f:
             source_code = f.read()
 
+        test_file_path = f"tests/test_{module}_auto.py"
+        
+        # Get existing test names to avoid duplicates
+        existing_tests = get_existing_test_names(test_file_path)
+        existing_code = ""
+        if os.path.exists(test_file_path):
+            with open(test_file_path, "r") as f:
+                existing_code = f.read()
+
+        # Get module-specific coverage context
+        module_coverage = None
+        if coverage_context and module in coverage_context:
+            module_coverage = coverage_context[module]
+
         test_code = None
 
         for attempt in range(1, MAX_RETRIES + 1):
             print(f"🔁 Generating tests for {module} (attempt {attempt})")
+            if existing_tests:
+                print(f"   📋 Existing tests: {len(existing_tests)} (will preserve)")
 
             generated = generate_tests_with_gemini(
                 client=client,
                 source_code=source_code,
                 module=module,
                 risk_level=risk_level,
-                coverage_context=coverage_context
+                coverage_context=module_coverage,
+                existing_tests=existing_tests
             )
 
             if is_valid_python(generated):
@@ -180,20 +234,18 @@ def tester_agent(plan: Dict) -> Dict:
             print(f"🚨 Failed to generate valid tests for {module}, using fallback")
             test_code = fallback_test(module)
 
-        test_file_path = f"tests/test_{module}_auto.py"
-
-        # ✅ MINIMAL CHANGE (THIS IS THE KEY)
-        # overwrite normally, append during coverage healing
-        mode = "a" if coverage_context else "w"
-
-        with open(test_file_path, mode) as f:
-            f.write("\n\n" + test_code)
+        # Count new tests generated
+        new_test_count = test_code.count("def test_")
+        
+        # Write new tests (overwrite since LLM was told about existing tests)
+        with open(test_file_path, "w") as f:
+            f.write(test_code)
 
         created_files.append(test_file_path)
-        total_tests += test_code.count("def test_")
+        total_tests += new_test_count
+        print(f"   ✅ Generated {new_test_count} tests for {module}")
 
     return {
         "test_files_created": created_files,
         "num_tests_generated": total_tests
     }
-

@@ -132,7 +132,7 @@ class PaymentService:
         return wallet.balance
 
     def process_payment(self, user_id, amount, currency):
-        if amount < 0:
+        if amount <= 0:
             raise ValueError("Invalid amount")
 
         payment_id = str(uuid.uuid4())
@@ -203,3 +203,4 @@ def export_report(service, path="data/report.json"):
         }
     with open(path, "w") as f:
         json.dump(report, f, indent=2)
+

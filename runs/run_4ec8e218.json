@@ -1,0 +1,39 @@
+{
+  "run_id": "run_4ec8e218",
+  "planner_output": {
+    "modules_to_test": [
+      "payments"
+    ],
+    "test_types": [
+      "unit"
+    ],
+    "risk_level": "medium",
+    "reason": "medium severity issue affecting ['payments']"
+  },
+  "tester_output": null,
+  "executor_output": {
+    "status": "fail",
+    "total_tests": 15,
+    "passed_tests": 13,
+    "failed_tests": [
+      "test_batch_payments_mixed_results - asser...",
+      "test_export_report_multiple_wallets_and_transactions"
+    ],
+    "failed_test_files": [
+      "FAILED tests/test_payments_auto.py"
+    ],
+    "coverage_percent": 98.48484848484848,
+    "uncovered_files": {
+      "src/payments.py": [
+        36,
+        76
+      ]
+    },
+    "logs": "============================= test session starts ==============================\nplatform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0\nrootdir: /home/brahmanya/autonomous-llm-devops-agent\nplugins: metadata-3.1.1, anyio-4.11.0, mock-3.15.1, json-report-1.5.0, langsmith-0.4.41, cov-7.0.0\ncollected 15 items\n\ntests/test_payments_auto.py .........F..F..                              [100%]\n\n=================================== FAILURES ===================================\n______________________ test_batch_payments_mixed_results _______________________\n\nclean_service = <payments.PaymentService object at 0x7147a1396ae0>\n\n    def test_batch_payments_mixed_results(clean_service):\n        user_id = \"user123\"\n        clean_service.add_funds(user_id, 200) # Funds for some, but not all\n    \n        # Mock gateway to ensure specific failures\n        class MockGatewayFailure(PaymentGateway):\n            def charge(self, payment, rand=None):\n                return False # Always fail\n    \n        clean_service.gateway = MockGatewayFailure()\n    \n        payments_batch = [\n            (50, \"USD\"),    # Should succeed (funds available)\n            (100, \"EUR\"),   # Should succeed (funds available, total 150/200 spent)\n            (100001, \"USD\"),# Should be fraud (amount > 100000)\n            (75, \"INR\"),    # Should fail insufficient funds (remaining funds 50, needs 75)\n            (0, \"USD\"),     # Should raise ValueError and return False by batch_payments\n            (25, \"USD\"),    # This payment should be able to process after fraud/value error\n        ]\n    \n        results = batch_payments(clean_service, user_id, payments_batch)\n    \n        # Expected results: Success, Success, Fraud(False), InsufficientFunds(False), InvalidAmount(False), Success\n>       assert results == [True, True, False, False, False, True]\nE       assert [False, False... False, False] == [True, True, ..., False, True]\nE         \nE         At index 0 diff: False != True\nE         Use -v to get more diff\n\ntests/test_payments_auto.py:180: AssertionError\n_____________ test_export_report_multiple_wallets_and_transactions _____________\n\ntmp_path = PosixPath('/tmp/pytest-of-brahmanya/pytest-57/test_export_report_multiple_wa0')\n\n    def test_export_report_multiple_wallets_and_transactions(tmp_path):\n        service = PaymentService()\n        user1 = \"user1\"\n        user2 = \"user2\"\n    \n        service.add_funds(user1, 100)\n        service.process_payment(user1, 30, \"USD\")\n    \n        service.add_funds(user2, 500)\n        service.process_payment(user2, 100, \"EUR\")\n        service.process_payment(user2, 50, \"INR\")\n    \n        report_path = tmp_path / \"report.json\"\n        export_report(service, path=str(report_path))\n    \n        assert report_path.exists()\n        with open(report_path, \"r\") as f:\n            data = json.load(f)\n    \n        assert data[user1][\"balance\"] == 70\n        assert len(data[user1][\"transactions\"]) == 2\n        assert [\"CREDIT\", 100] in data[user1][\"transactions\"]\n        assert [\"DEBIT\", 30] in data[user1][\"transactions\"]\n    \n>       assert data[user2][\"balance\"] == 350\nE       assert 500 == 350\n\ntests/test_payments_auto.py:242: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_payments_auto.py::test_batch_payments_mixed_results - asser...\nFAILED tests/test_payments_auto.py::test_export_report_multiple_wallets_and_transactions\n========================= 2 failed, 13 passed in 0.08s =========================\n",
+    "summary_report": "\u274c 2 failed, 13 passed (Total: 15)",
+    "execution_time_ms": 938
+  },
+  "failure_analysis": null,
+  "start_time": "2026-01-21T00:41:34.664929+00:00",
+  "end_time": "2026-01-21T00:41:38.210368+00:00"
+}
