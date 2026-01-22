@@ -1,0 +1,137 @@
+{
+  "run_id": "run_0a32d407",
+  "planner_output": {
+    "modules_to_test": [
+      "payments"
+    ],
+    "test_types": [
+      "unit"
+    ],
+    "risk_level": "medium",
+    "reason": "medium severity issue affecting ['payments']"
+  },
+  "tester_output": {
+    "test_files_created": [
+      "tests/test_payments_auto.py"
+    ],
+    "num_tests_generated": 15
+  },
+  "executor_output": {
+    "status": "fail",
+    "total_tests": 15,
+    "passed_tests": 13,
+    "failed_tests": [
+      "test_payment_gateway_charge_outcomes - as...",
+      "test_batch_payments_functionality - asser..."
+    ],
+    "failed_test_files": [
+      "FAILED tests/test_payments_auto.py"
+    ],
+    "coverage_percent": 85.60606060606061,
+    "uncovered_files": {
+      "src/payments.py": [
+        57,
+        58,
+        73,
+        74,
+        75,
+        76,
+        77,
+        80,
+        136,
+        167,
+        168,
+        169,
+        187,
+        188,
+        198,
+        199,
+        200,
+        204,
+        205
+      ]
+    },
+    "logs": "============================= test session starts ==============================\nplatform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0\nrootdir: /home/brahmanya/autonomous-llm-devops-agent\nplugins: metadata-3.1.1, anyio-4.11.0, mock-3.15.1, json-report-1.5.0, langsmith-0.4.41, cov-7.0.0\ncollected 15 items\n\ntests/test_payments_auto.py .....F.......F.                              [100%]\n\n=================================== FAILURES ===================================\n_____________________ test_payment_gateway_charge_outcomes _____________________\n\nmonkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fc30094fc20>\n\n    def test_payment_gateway_charge_outcomes(monkeypatch):\n        \"\"\"Tests PaymentGateway charge for success and failure outcomes by mocking random.\"\"\"\n        gateway = PaymentGateway()\n        payment = Payment(\"id\", 100, \"USD\", \"user\")\n    \n        # Force success (rand(1,10) < 8 -> e.g., 1-7)\n        monkeypatch.setattr(random, \"randint\", lambda a, b: 5)\n        assert gateway.charge(payment) is True\n    \n        # Force failure (rand(1,10) < 8 -> e.g., 8-10)\n        monkeypatch.setattr(random, \"randint\", lambda a, b: 9)\n>       assert gateway.charge(payment) is False\nE       assert True is False\nE        +  where True = charge(<payments.Payment object at 0x7fc30097e270>)\nE        +    where charge = <payments.PaymentGateway object at 0x7fc30097e930>.charge\n\ntests/test_payments_auto.py:189: AssertionError\n______________________ test_batch_payments_functionality _______________________\n\npayment_service_instance = <payments.PaymentService object at 0x7fc3009a0830>\nmock_fraud_checker_safe = None, mock_gateway_charge_success = None\nmock_gateway_charge_fail = None\n\n    def test_batch_payments_functionality(payment_service_instance, mock_fraud_checker_safe, mock_gateway_charge_success, mock_gateway_charge_fail):\n        \"\"\"Tests the batch_payments utility function with mixed results.\"\"\"\n        user_id = \"user_batch\"\n        service = payment_service_instance\n        service.add_funds(user_id, 1000)\n    \n        # Payments: 1 success, 1 insufficient funds, 1 invalid amount, 1 gateway failure\n        payments_to_process = [\n            (100, \"USD\"),  # Should succeed\n            (800, \"USD\"),  # Should fail due to insufficient funds (1000-100 = 900, but next payment needs 800, so 100 remaining)\n            (0, \"USD\"),    # Should fail due to invalid amount\n            (50, \"USD\")    # Should fail due to gateway failure (mocked later)\n        ]\n    \n        # Mock gateway charge failure for the 4th payment\n        with patch.object(service.gateway, 'charge', side_effect=[True, True, True, False]) as mock_charge:\n            results = batch_payments(service, user_id, payments_to_process)\n    \n>           assert results == [True, False, False, False] # Insufficient funds is also a False result\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE           assert [True, True, False, True] == [True, False, False, False]\nE             \nE             At index 1 diff: True != False\nE             Use -v to get more diff\n\ntests/test_payments_auto.py:361: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_payments_auto.py::test_payment_gateway_charge_outcomes - as...\nFAILED tests/test_payments_auto.py::test_batch_payments_functionality - asser...\n========================= 2 failed, 13 passed in 0.14s =========================\n",
+    "summary_report": "\u274c 2 failed, 13 passed (Total: 15)",
+    "execution_time_ms": 1219
+  },
+  "failure_analysis": {
+    "failure_type": "coverage_gap",
+    "reason": "Coverage below threshold (85.60606060606061%)",
+    "next_step": "regenerate_tests_for_coverage",
+    "confidence": "high",
+    "coverage_percent": 85.60606060606061,
+    "uncovered_lines": []
+  },
+  "start_time": "2026-01-22T18:12:32.480427+00:00",
+  "end_time": "2026-01-22T18:13:11.969790+00:00",
+  "healer_output": {
+    "needs_healing": true,
+    "coverage_percent": 85.60606060606061,
+    "coverage_threshold": 98,
+    "coverage_gap": 12.39,
+    "uncovered_files": {
+      "src/payments.py": [
+        57,
+        58,
+        73,
+        74,
+        75,
+        76,
+        77,
+        80,
+        136,
+        167,
+        168,
+        169,
+        187,
+        188,
+        198,
+        199,
+        200,
+        204,
+        205
+      ]
+    },
+    "coverage_context": {
+      "payments": {
+        "uncovered_lines": [
+          57,
+          58,
+          73,
+          74,
+          75,
+          76,
+          77,
+          80,
+          136,
+          167,
+          168,
+          169,
+          187,
+          188,
+          198,
+          199,
+          200,
+          204,
+          205
+        ],
+        "uncovered_functions": [
+          "PaymentRepository.update_status",
+          "PaymentRepository.get_by_user",
+          "export_report",
+          "PaymentService.refund",
+          "PaymentRepository.__init__",
+          "batch_payments",
+          "PaymentService.process_payment"
+        ],
+        "line_count": 19
+      }
+    },
+    "dead_code_candidates": [],
+    "modules_needing_tests": [
+      "payments"
+    ],
+    "recommendation": "Generate targeted tests for 19 uncovered lines across 1 module(s)."
+  }
+}

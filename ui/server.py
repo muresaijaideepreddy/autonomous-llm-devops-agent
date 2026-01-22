@@ -12,13 +12,17 @@ from pathlib import Path
 import json
 import os
 import asyncio
+import sys
 
-from streaming_orchestrator import StreamingOrchestrator
+# Add parent directory (project root) to path for imports
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from orchestrator import StreamingOrchestrator
 
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
-PROJECT_ROOT = Path(__file__).parent.parent
 RUNS_DIR = PROJECT_ROOT / "runs"
 METRICS_FILE = PROJECT_ROOT / "metrics" / "run_metrics.json"
 COVERAGE_FILE = PROJECT_ROOT / "coverage.json"
