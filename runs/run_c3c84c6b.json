@@ -1,0 +1,35 @@
+{
+  "run_id": "run_c3c84c6b",
+  "planner_output": {
+    "modules_to_test": [
+      "payments"
+    ],
+    "test_types": [
+      "unit"
+    ],
+    "risk_level": "medium",
+    "reason": "medium severity issue affecting ['payments']"
+  },
+  "tester_output": null,
+  "executor_output": {
+    "status": "fail",
+    "total_tests": 18,
+    "passed_tests": 15,
+    "failed_tests": [
+      "test_payment_gateway_charge_outcomes - as...",
+      "test_batch_payments_with_invalid_amount",
+      "test_export_report - assert 70 == 50"
+    ],
+    "failed_test_files": [
+      "FAILED tests/test_payments_auto.py"
+    ],
+    "coverage_percent": 100.0,
+    "uncovered_files": {},
+    "logs": "============================= test session starts ==============================\nplatform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0\nrootdir: /home/brahmanya/autonomous-llm-devops-agent\nplugins: metadata-3.1.1, anyio-4.11.0, mock-3.15.1, json-report-1.5.0, langsmith-0.4.41, cov-7.0.0\ncollected 18 items\n\ntests/test_payments_auto.py ........F.......FF                           [100%]\n\n=================================== FAILURES ===================================\n_____________________ test_payment_gateway_charge_outcomes _____________________\n\nmonkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7b5009474f80>\n\n    def test_payment_gateway_charge_outcomes(monkeypatch):\n        \"\"\"Test PaymentGateway.charge with deterministic success and failure.\"\"\"\n        gateway = PaymentGateway()\n        payment = Payment(\"g1\", 100, \"USD\", \"userG\")\n    \n        # Force success (rand(1,10) < 8 means 1-7 pass, 8-10 fail)\n        # Mock rand to return 7\n        with patch('random.randint', return_value=7):\n>           assert gateway.charge(payment) is True\nE           assert False is True\nE            +  where False = charge(<payments.Payment object at 0x7b50094754f0>)\nE            +    where charge = <payments.PaymentGateway object at 0x7b5009476e70>.charge\n\ntests/test_payments_auto.py:170: AssertionError\n___________________ test_batch_payments_with_invalid_amount ____________________\n\nrepository = <payments.PaymentRepository object at 0x7b500949c110>\n\n    def test_batch_payments_with_invalid_amount(repository):\n        \"\"\"Test batch_payments function with an invalid amount causing ValueError.\"\"\"\n        service = PaymentService(repo=repository) # Use default mocks if not needed\n        user_id = \"batch_invalid_user\"\n        service.add_funds(user_id, 100)\n    \n        payments_to_process = [\n            (50, \"USD\"),\n            (0, \"EUR\"), # Invalid amount\n            (20, \"INR\")\n        ]\n    \n        with patch('uuid.uuid4', side_effect=[\"id-b-1\", \"id-b-2\", \"id-b-3\"]):\n            results = batch_payments(service, user_id, payments_to_process)\n    \n        assert results == [True, False, True] # Second payment is False due to ValueError\n        assert service.user_balance(user_id) == (100 - 50 - 20) # 30\n        all_payments = repository.get_by_user(user_id)\n        assert len(all_payments) == 2 # Only valid payments are processed and saved\n        assert {p[\"status\"] for p in all_payments} == {\"SUCCESS\"} # No FAILED status from ValueError\n        assert next(p for p in all_payments if p[\"payment_id\"] == \"id-b-1\")[\"status\"] == \"SUCCESS\"\n>       assert next(p for p in all_payments if p[\"payment_id\"] == \"id-b-3\")[\"status\"] == \"SUCCESS\"\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE       StopIteration\n\ntests/test_payments_auto.py:395: StopIteration\n______________________________ test_export_report ______________________________\n\nrepository = <payments.PaymentRepository object at 0x7b50094e6ea0>\ntmp_path = PosixPath('/tmp/pytest-of-brahmanya/pytest-0/test_export_report0')\nmock_uuid = 'test-payment-id-123'\n\n    def test_export_report(repository, tmp_path, mock_uuid):\n        \"\"\"Test the export_report utility function.\"\"\"\n        service = PaymentService(repo=repository)\n        user_id_1 = \"user_report_1\"\n        user_id_2 = \"user_report_2\"\n    \n        service.add_funds(user_id_1, 100)\n        service.add_funds(user_id_2, 200)\n    \n        # Process some payments to generate transactions\n        with patch('random.randint', return_value=1): # Force gateway success\n            with patch('uuid.uuid4', side_effect=[\"pay1\", \"pay2\", \"pay3\"]):\n                service.process_payment(user_id_1, 30, \"USD\")\n                service.process_payment(user_id_2, 50, \"EUR\")\n                service.process_payment(user_id_1, 20, \"INR\")\n    \n        # The mock uuid is \"pay1\", \"pay2\", \"pay3\"\n        # Wallet for user_report_1: 100(credit), 30(debit), 20(debit) -> balance 50\n        # Wallet for user_report_2: 200(credit), 50(debit) -> balance 150\n    \n        report_path = tmp_path / \"test_report.json\"\n        export_report(service, str(report_path))\n    \n        assert report_path.exists()\n        with open(report_path, \"r\") as f:\n            report = json.load(f)\n    \n        assert user_id_1 in report\n>       assert report[user_id_1][\"balance\"] == 50\nE       assert 70 == 50\n\ntests/test_payments_auto.py:426: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_payments_auto.py::test_payment_gateway_charge_outcomes - as...\nFAILED tests/test_payments_auto.py::test_batch_payments_with_invalid_amount\nFAILED tests/test_payments_auto.py::test_export_report - assert 70 == 50\n========================= 3 failed, 15 passed in 0.11s =========================\n",
+    "summary_report": "\u274c 3 failed, 15 passed (Total: 18)",
+    "execution_time_ms": 1040
+  },
+  "failure_analysis": null,
+  "start_time": "2026-01-26T19:33:07.824466+00:00",
+  "end_time": "2026-01-26T19:33:10.668735+00:00"
+}
