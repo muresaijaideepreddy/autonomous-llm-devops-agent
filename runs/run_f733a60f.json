@@ -1,0 +1,33 @@
+{
+  "run_id": "run_f733a60f",
+  "planner_output": {
+    "modules_to_test": [
+      "payments"
+    ],
+    "test_types": [
+      "unit"
+    ],
+    "risk_level": "medium",
+    "reason": "medium severity issue affecting ['payments']"
+  },
+  "tester_output": null,
+  "executor_output": {
+    "status": "fail",
+    "total_tests": 14,
+    "passed_tests": 13,
+    "failed_tests": [
+      "test_payment_gateway_charge_deterministic"
+    ],
+    "failed_test_files": [
+      "FAILED tests/test_payments_auto.py"
+    ],
+    "coverage_percent": 100.0,
+    "uncovered_files": {},
+    "logs": "============================= test session starts ==============================\nplatform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0\nrootdir: /home/brahmanya/autonomous-llm-devops-agent\nplugins: metadata-3.1.1, anyio-4.11.0, mock-3.15.1, json-report-1.5.0, langsmith-0.4.41, cov-7.0.0\ncollected 14 items\n\ntests/test_payments_auto.py .....F........                               [100%]\n\n=================================== FAILURES ===================================\n__________________ test_payment_gateway_charge_deterministic ___________________\n\nself = <MagicMock name='randint' id='139864011404688'>, args = (1, 10)\nkwargs = {}, msg = \"Expected 'randint' to be called once. Called 0 times.\"\n\n    def assert_called_once_with(self, /, *args, **kwargs):\n        \"\"\"assert that the mock was called exactly once and that that call was\n        with the specified arguments.\"\"\"\n        if not self.call_count == 1:\n            msg = (\"Expected '%s' to be called once. Called %s times.%s\"\n                   % (self._mock_name or 'mock',\n                      self.call_count,\n                      self._calls_repr()))\n>           raise AssertionError(msg)\nE           AssertionError: Expected 'randint' to be called once. Called 0 times.\n\n/usr/lib/python3.12/unittest/mock.py:955: AssertionError\n\nDuring handling of the above exception, another exception occurred:\n\n    def test_payment_gateway_charge_deterministic():\n        gateway = PaymentGateway()\n        payment = Payment(\"id\", 100, \"USD\", \"user\")\n    \n        # Mock random.randint to ensure success (returns 1, 1 < 8)\n        with patch('random.randint', return_value=1) as mock_randint_success:\n            assert gateway.charge(payment) is True\n>           mock_randint_success.assert_called_once_with(1, 10)\nE           AssertionError: Expected 'randint' to be called once. Called 0 times.\n\ntests/test_payments_auto.py:131: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_payments_auto.py::test_payment_gateway_charge_deterministic\n========================= 1 failed, 13 passed in 0.11s =========================\n",
+    "summary_report": "\u274c 1 failed, 13 passed (Total: 14)",
+    "execution_time_ms": 950
+  },
+  "failure_analysis": null,
+  "start_time": "2026-01-28T04:48:21.973568+00:00",
+  "end_time": "2026-01-28T04:48:24.727390+00:00"
+}

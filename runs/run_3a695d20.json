@@ -1,0 +1,136 @@
+{
+  "run_id": "run_3a695d20",
+  "planner_output": {
+    "modules_to_test": [
+      "payments"
+    ],
+    "test_types": [
+      "unit"
+    ],
+    "risk_level": "medium",
+    "reason": "medium severity issue affecting ['payments']"
+  },
+  "tester_output": {
+    "test_files_created": [
+      "tests/test_payments_auto.py"
+    ],
+    "num_tests_generated": 14
+  },
+  "executor_output": {
+    "status": "fail",
+    "total_tests": 14,
+    "passed_tests": 13,
+    "failed_tests": [
+      "test_payment_gateway_charge_deterministic"
+    ],
+    "failed_test_files": [
+      "FAILED tests/test_payments_auto.py"
+    ],
+    "coverage_percent": 85.60606060606061,
+    "uncovered_files": {
+      "src/payments.py": [
+        57,
+        58,
+        73,
+        74,
+        75,
+        76,
+        77,
+        80,
+        136,
+        167,
+        168,
+        169,
+        187,
+        188,
+        198,
+        199,
+        200,
+        204,
+        205
+      ]
+    },
+    "logs": "============================= test session starts ==============================\nplatform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0\nrootdir: /home/brahmanya/autonomous-llm-devops-agent\nplugins: metadata-3.1.1, anyio-4.11.0, mock-3.15.1, json-report-1.5.0, langsmith-0.4.41, cov-7.0.0\ncollected 14 items\n\ntests/test_payments_auto.py .....F........                               [100%]\n\n=================================== FAILURES ===================================\n__________________ test_payment_gateway_charge_deterministic ___________________\n\nself = <MagicMock name='randint' id='129514661634672'>, args = (1, 10)\nkwargs = {}, msg = \"Expected 'randint' to be called once. Called 0 times.\"\n\n    def assert_called_once_with(self, /, *args, **kwargs):\n        \"\"\"assert that the mock was called exactly once and that that call was\n        with the specified arguments.\"\"\"\n        if not self.call_count == 1:\n            msg = (\"Expected '%s' to be called once. Called %s times.%s\"\n                   % (self._mock_name or 'mock',\n                      self.call_count,\n                      self._calls_repr()))\n>           raise AssertionError(msg)\nE           AssertionError: Expected 'randint' to be called once. Called 0 times.\n\n/usr/lib/python3.12/unittest/mock.py:955: AssertionError\n\nDuring handling of the above exception, another exception occurred:\n\n    def test_payment_gateway_charge_deterministic():\n        gateway = PaymentGateway()\n        payment = Payment(\"id\", 100, \"USD\", \"user\")\n    \n        # Mock random.randint to ensure success (returns 1, 1 < 8)\n        with patch('random.randint', return_value=1) as mock_randint_success:\n            assert gateway.charge(payment) is True\n>           mock_randint_success.assert_called_once_with(1, 10)\nE           AssertionError: Expected 'randint' to be called once. Called 0 times.\n\ntests/test_payments_auto.py:131: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_payments_auto.py::test_payment_gateway_charge_deterministic\n========================= 1 failed, 13 passed in 0.15s =========================\n",
+    "summary_report": "\u274c 1 failed, 13 passed (Total: 14)",
+    "execution_time_ms": 1068
+  },
+  "failure_analysis": {
+    "failure_type": "coverage_gap",
+    "reason": "Coverage below threshold (85.60606060606061%)",
+    "next_step": "regenerate_tests_for_coverage",
+    "confidence": "high",
+    "coverage_percent": 85.60606060606061,
+    "uncovered_lines": []
+  },
+  "start_time": "2026-01-28T04:46:42.652805+00:00",
+  "end_time": "2026-01-28T04:47:34.267595+00:00",
+  "healer_output": {
+    "needs_healing": true,
+    "coverage_percent": 85.60606060606061,
+    "coverage_threshold": 98,
+    "coverage_gap": 12.39,
+    "uncovered_files": {
+      "src/payments.py": [
+        57,
+        58,
+        73,
+        74,
+        75,
+        76,
+        77,
+        80,
+        136,
+        167,
+        168,
+        169,
+        187,
+        188,
+        198,
+        199,
+        200,
+        204,
+        205
+      ]
+    },
+    "coverage_context": {
+      "payments": {
+        "uncovered_lines": [
+          57,
+          58,
+          73,
+          74,
+          75,
+          76,
+          77,
+          80,
+          136,
+          167,
+          168,
+          169,
+          187,
+          188,
+          198,
+          199,
+          200,
+          204,
+          205
+        ],
+        "uncovered_functions": [
+          "PaymentRepository.update_status",
+          "PaymentRepository.get_by_user",
+          "export_report",
+          "PaymentService.refund",
+          "PaymentRepository.__init__",
+          "batch_payments",
+          "PaymentService.process_payment"
+        ],
+        "line_count": 19
+      }
+    },
+    "dead_code_candidates": [],
+    "modules_needing_tests": [
+      "payments"
+    ],
+    "recommendation": "Generate targeted tests for 19 uncovered lines across 1 module(s)."
+  }
+}
