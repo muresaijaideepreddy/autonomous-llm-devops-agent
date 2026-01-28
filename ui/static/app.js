@@ -665,5 +665,5 @@ function showCoverageDetails(data) {
     terminal.appendChild(entry);
     terminal.scrollTop = terminal.scrollHeight;
 
-    console.log("test");
+
 }
