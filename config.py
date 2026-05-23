@@ -12,6 +12,10 @@ TEST_DIR = "tests"
 # Enable coverage healing mode
 ENABLE_COVERAGE_HEALING = True
 
+# Maximum healing loop iterations (prevents infinite loops)
+# Each iteration: Tester generates targeted tests → Executor runs → Healer analyzes gaps → repeat
+MAX_HEALING_ITERATIONS = 3
+
 # Maximum tests by severity level
 MAX_TESTS_BY_SEVERITY = {
     "low": 12,
