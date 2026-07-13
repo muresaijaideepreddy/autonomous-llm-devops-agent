@@ -1,0 +1,35 @@
+{
+  "run_id": "run_5d16ec01",
+  "planner_output": {
+    "modules_to_test": [
+      "payments"
+    ],
+    "test_types": [
+      "unit",
+      "edge"
+    ],
+    "risk_level": "high",
+    "reason": "high severity issue affecting ['payments']"
+  },
+  "tester_output": null,
+  "executor_output": {
+    "status": "fail",
+    "total_tests": 14,
+    "passed_tests": 13,
+    "failed_tests": [
+      "test_payment_gateway_charge_deterministic"
+    ],
+    "failed_test_files": [
+      "FAILED tests/test_payments_auto.py"
+    ],
+    "coverage_percent": 100.0,
+    "uncovered_files": {},
+    "logs": "============================= test session starts ==============================\nplatform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0\nrootdir: /home/brahmanya/autonomous-llm-devops-agent\nplugins: langsmith-0.6.6, anyio-4.2.0\ncollected 14 items\n\ntests/test_payments_auto.py .....F........                               [100%]\n\n=================================== FAILURES ===================================\n__________________ test_payment_gateway_charge_deterministic ___________________\n\n    def test_payment_gateway_charge_deterministic():\n        gateway = PaymentGateway()\n        payment = Payment(\"id\", 100, \"USD\", \"user\")\n    \n        # Mock random.randint to ensure success (returns 1, 1 < 8)\n        with patch('random.randint', return_value=1) as mock_randint_success:\n>           assert gateway.charge(payment) is True\nE           assert False is True\nE            +  where False = charge(<payments.Payment object at 0x7a971c81ba70>)\nE            +    where charge = <payments.PaymentGateway object at 0x7a971c81ac60>.charge\n\ntests/test_payments_auto.py:130: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_payments_auto.py::test_payment_gateway_charge_deterministic\n========================= 1 failed, 13 passed in 0.07s =========================\n",
+    "summary_report": "\u274c 1 failed, 13 passed (Total: 14)",
+    "execution_time_ms": 1092
+  },
+  "failure_analysis": null,
+  "healing_iterations": 0,
+  "start_time": "2026-07-13T14:03:31.652776+00:00",
+  "end_time": "2026-07-13T14:03:32.746733+00:00"
+}

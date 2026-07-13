@@ -1,0 +1,79 @@
+{
+  "run_id": "run_98709554",
+  "planner_output": {
+    "modules_to_test": [
+      "payments",
+      "auth",
+      "inventory",
+      "notifications",
+      "orders",
+      "analytics"
+    ],
+    "test_types": [
+      "unit",
+      "edge"
+    ],
+    "risk_level": "high",
+    "reason": "high severity issue affecting ['payments', 'auth', 'inventory', 'notifications', 'orders', 'analytics']"
+  },
+  "tester_output": {
+    "test_files_created": [
+      "tests/test_payments_auto.py",
+      "tests/test_auth_auto.py",
+      "tests/test_inventory_auto.py",
+      "tests/test_notifications_auto.py",
+      "tests/test_orders_auto.py",
+      "tests/test_analytics_auto.py"
+    ],
+    "num_tests_generated": 118
+  },
+  "executor_output": {
+    "status": "fail",
+    "total_tests": 117,
+    "passed_tests": 112,
+    "failed_tests": [
+      "test_time_series_bucket_event_bucket - T...",
+      "test_trend_analyzer_detect_anomalies - a...",
+      "test_user_invalid_role - AssertionError: Rege...",
+      "test_is_locked - assert False is True",
+      "test_order_initialization - assert 21.6 == ..."
+    ],
+    "failed_test_files": [
+      "FAILED tests/test_analytics_auto.py",
+      "FAILED tests/test_orders_auto.py",
+      "FAILED tests/test_auth_auto.py"
+    ],
+    "coverage_percent": null,
+    "uncovered_files": {},
+    "logs": "============================= test session starts ==============================\nplatform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0\nrootdir: /home/brahmanya/autonomous-llm-devops-agent\nplugins: langsmith-0.6.6, anyio-4.2.0\ncollected 117 items\n\ntests/test_analytics_auto.py .........F....F.....                        [ 17%]\ntests/test_auth_auto.py ....F.F.............                             [ 34%]\ntests/test_inventory_auto.py ...................                         [ 50%]\ntests/test_notifications_auto.py .....................                   [ 68%]\ntests/test_orders_auto.py ................F....                          [ 86%]\ntests/test_payments_auto.py ................                             [100%]\n\n=================================== FAILURES ===================================\n_____________________ test_time_series_bucket_event_bucket _____________________\n\n    def test_time_series_bucket_event_bucket():\n        bucket = TimeSeriesBucket(\"hour\")\n        now = datetime.now(timezone.utc)\n>       events = [Event(\"page_view\", properties={\"data\": i}, timestamp=now - timedelta(hours=i)) for i in range(5)]\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE       TypeError: Event.__init__() got an unexpected keyword argument 'timestamp'\n\ntests/test_analytics_auto.py:67: TypeError\n_____________________ test_trend_analyzer_detect_anomalies _____________________\n\n    def test_trend_analyzer_detect_anomalies():\n        anomalies = TrendAnalyzer.detect_anomalies([1, 2, 3, 20])\n>       assert len(anomalies) == 1\nE       assert 0 == 1\nE        +  where 0 = len([])\n\ntests/test_analytics_auto.py:86: AssertionError\n____________________________ test_user_invalid_role ____________________________\n\n    def test_user_invalid_role():\n        with pytest.raises(ValueError, match=\"Invalid role: invalid_role. Must be one of {'admin', 'user', 'guest'}\"):\n>           User(\"testuser\", \"test@example.com\", \"password123\", \"invalid_role\")\n\ntests/test_auth_auto.py:42: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nself = <auth.User object at 0x706c6026dca0>, username = 'testuser'\nemail = 'test@example.com', password = 'password123', role = 'invalid_role'\n\n    def __init__(self, username: str, email: str, password: str, role: str = \"user\"):\n        if not username or len(username) < 3:\n            raise ValueError(\"Username must be at least 3 characters\")\n        if \"@\" not in email or \".\" not in email:\n            raise ValueError(\"Invalid email format\")\n        if len(password) < 8:\n            raise ValueError(\"Password must be at least 8 characters\")\n        if role not in self.VALID_ROLES:\n>           raise ValueError(f\"Invalid role: {role}. Must be one of {self.VALID_ROLES}\")\nE           ValueError: Invalid role: invalid_role. Must be one of {'guest', 'user', 'admin'}\n\nsrc/auth.py:38: ValueError\n\nDuring handling of the above exception, another exception occurred:\n\n    def test_user_invalid_role():\n>       with pytest.raises(ValueError, match=\"Invalid role: invalid_role. Must be one of {'admin', 'user', 'guest'}\"):\nE       AssertionError: Regex pattern did not match.\nE         Expected regex: \"Invalid role: invalid_role. Must be one of {'admin', 'user', 'guest'}\"\nE         Actual message: \"Invalid role: invalid_role. Must be one of {'guest', 'user', 'admin'}\"\n\ntests/test_auth_auto.py:41: AssertionError\n________________________________ test_is_locked ________________________________\n\nuser = <auth.User object at 0x706c6026f2f0>\n\n    def test_is_locked(user):\n        assert user.is_locked() is False\n        user.record_failed_login()\n        assert user.is_locked() is False\n        user.record_failed_login(5)\n>       assert user.is_locked() is True\nE       assert False is True\nE        +  where False = is_locked()\nE        +    where is_locked = <auth.User object at 0x706c6026f2f0>.is_locked\n\ntests/test_auth_auto.py:53: AssertionError\n__________________________ test_order_initialization ___________________________\n\n    def test_order_initialization():\n        item = OrderItem(product_id='prod1', name='Product 1', price=10.0, quantity=2)\n        order = Order(user_id='user1', items=[item])\n        assert order.user_id == 'user1'\n        assert order.status == 'CREATED'\n>       assert order.total == 10.8  # 10.0 subtotal + 0.8 tax (8% of 10.0)\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^\nE       assert 21.6 == 10.8\nE        +  where 21.6 = <orders.Order object at 0x706c601ff500>.total\n\ntests/test_orders_auto.py:114: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_analytics_auto.py::test_time_series_bucket_event_bucket - T...\nFAILED tests/test_analytics_auto.py::test_trend_analyzer_detect_anomalies - a...\nFAILED tests/test_auth_auto.py::test_user_invalid_role - AssertionError: Rege...\nFAILED tests/test_auth_auto.py::test_is_locked - assert False is True\nFAILED tests/test_orders_auto.py::test_order_initialization - assert 21.6 == ...\n======================== 5 failed, 112 passed in 0.16s =========================\n",
+    "summary_report": "\u274c 5 failed, 112 passed (Total: 117)",
+    "execution_time_ms": 913
+  },
+  "failure_analysis": {
+    "failure_type": "code_bug",
+    "reason": "Assertion failure indicates business logic mismatch",
+    "next_step": "suggest_code_fix",
+    "confidence": "high",
+    "failed_tests": [
+      "test_time_series_bucket_event_bucket - T...",
+      "test_trend_analyzer_detect_anomalies - a...",
+      "test_user_invalid_role - AssertionError: Rege...",
+      "test_is_locked - assert False is True",
+      "test_order_initialization - assert 21.6 == ..."
+    ]
+  },
+  "healing_iterations": 1,
+  "start_time": "2026-07-13T14:33:01.178281+00:00",
+  "end_time": "2026-07-13T14:34:11.388160+00:00",
+  "healer_output": {
+    "needs_healing": false,
+    "coverage_percent": null,
+    "coverage_threshold": 98,
+    "coverage_gap": 98,
+    "uncovered_files": {},
+    "coverage_context": {},
+    "dead_code_candidates": [],
+    "modules_needing_tests": [],
+    "recommendation": "Coverage threshold met. No action needed."
+  }
+}

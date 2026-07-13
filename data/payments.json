@@ -4,7 +4,7 @@
     "amount": 100,
     "currency": "USD",
     "user_id": "user7",
-    "status": "FAILED",
+    "status": "REFUNDED",
     "created_at": "2026-01-21T01:47:46.796293+00:00"
   },
   {
@@ -1006,5 +1006,229 @@
     "user_id": "user11",
     "status": "FAILED",
     "created_at": "2026-01-28T04:46:44.618932+00:00"
+  },
+  {
+    "payment_id": "47bb8632-0fef-4636-ac06-e62e07d326a8",
+    "amount": 100,
+    "currency": "USD",
+    "user_id": "user_1",
+    "status": "FAILED",
+    "created_at": "2026-07-13T14:05:39.621630+00:00"
+  },
+  {
+    "payment_id": "af35ad89-2e9e-47b3-925a-cd57f5e4354b",
+    "amount": 100001,
+    "currency": "USD",
+    "user_id": "user_1",
+    "status": "FAILED",
+    "created_at": "2026-07-13T14:05:39.637648+00:00"
+  },
+  {
+    "payment_id": "037b0032-6f9a-4b4c-a47a-70226c8732fa",
+    "amount": 100,
+    "currency": "USD",
+    "user_id": "user_1",
+    "status": "FAILED",
+    "created_at": "2026-07-13T14:05:39.639607+00:00"
+  },
+  {
+    "payment_id": "78d56b72-3775-4aa7-8cea-ca7835d41562",
+    "amount": 100,
+    "currency": "USD",
+    "user_id": "user_1",
+    "status": "SUCCESS",
+    "created_at": "2026-07-13T14:05:39.641257+00:00"
+  },
+  {
+    "payment_id": "739d3e06-62bb-40c6-9ccd-984a140570e0",
+    "amount": 100,
+    "currency": "USD",
+    "user_id": "user_1",
+    "status": "SUCCESS",
+    "created_at": "2026-07-13T14:05:39.645102+00:00"
+  },
+  {
+    "payment_id": "ffabe642-5b40-4d5b-932c-1e71b89ac214",
+    "amount": 50,
+    "currency": "USD",
+    "user_id": "user_1",
+    "status": "SUCCESS",
+    "created_at": "2026-07-13T14:05:39.646106+00:00"
+  },
+  {
+    "payment_id": "39fb0816-1579-494f-8fcc-76b0a4dbcd6f",
+    "amount": 75,
+    "currency": "USD",
+    "user_id": "user_1",
+    "status": "FAILED",
+    "created_at": "2026-07-13T14:05:39.647136+00:00"
+  },
+  {
+    "payment_id": "4651ace9-1ab3-4e2e-a180-fa3a673019ad",
+    "amount": 50,
+    "currency": "USD",
+    "user_id": "user123",
+    "status": "SUCCESS",
+    "created_at": "2026-07-13T14:18:25.960286+00:00"
+  },
+  {
+    "payment_id": "daba17c2-ae54-4f27-adc0-79d7741a6de1",
+    "amount": 20,
+    "currency": "USD",
+    "user_id": "user123",
+    "status": "FAILED",
+    "created_at": "2026-07-13T14:18:25.961335+00:00"
+  },
+  {
+    "payment_id": "b567cc3b-e7b5-4dfc-b657-59ca6c1ddc2a",
+    "amount": 30,
+    "currency": "USD",
+    "user_id": "user123",
+    "status": "SUCCESS",
+    "created_at": "2026-07-13T14:18:25.962317+00:00"
+  },
+  {
+    "payment_id": "669c1eac-7345-486b-ae26-f9db7ae7c79b",
+    "amount": 50,
+    "currency": "USD",
+    "user_id": "user123",
+    "status": "FAILED",
+    "created_at": "2026-07-13T14:29:58.681544+00:00"
+  },
+  {
+    "payment_id": "2a1c5a74-3424-42bd-9a8c-b80ddc8b2f25",
+    "amount": 20,
+    "currency": "USD",
+    "user_id": "user123",
+    "status": "SUCCESS",
+    "created_at": "2026-07-13T14:29:58.682119+00:00"
+  },
+  {
+    "payment_id": "a4b44445-b904-4798-a55e-8373562da1fb",
+    "amount": 30,
+    "currency": "USD",
+    "user_id": "user123",
+    "status": "SUCCESS",
+    "created_at": "2026-07-13T14:29:58.682636+00:00"
+  },
+  {
+    "payment_id": "10f54dd3-ec72-4f6a-8040-567b3cff02d8",
+    "amount": 50,
+    "currency": "USD",
+    "user_id": "user123",
+    "status": "SUCCESS",
+    "created_at": "2026-07-13T14:31:52.090149+00:00"
+  },
+  {
+    "payment_id": "4cbe2e44-7068-4417-9e89-db939e7f8d0f",
+    "amount": 50,
+    "currency": "USD",
+    "user_id": "user123",
+    "status": "FAILED",
+    "created_at": "2026-07-13T14:31:52.091216+00:00"
+  },
+  {
+    "payment_id": "516f78e7-c113-4be4-9ee7-777f59dd7371",
+    "amount": 50,
+    "currency": "USD",
+    "user_id": "user123",
+    "status": "REFUNDED",
+    "created_at": "2026-07-13T14:31:52.092558+00:00"
+  },
+  {
+    "payment_id": "c2b9bab1-1271-4272-b14c-512e483fcce0",
+    "amount": 50,
+    "currency": "USD",
+    "user_id": "user123",
+    "status": "SUCCESS",
+    "created_at": "2026-07-13T14:33:02.039765+00:00"
+  },
+  {
+    "payment_id": "0dd1d489-a499-4aa4-af25-ea43318ce83b",
+    "amount": 50,
+    "currency": "USD",
+    "user_id": "user123",
+    "status": "FAILED",
+    "created_at": "2026-07-13T14:33:02.041828+00:00"
+  },
+  {
+    "payment_id": "d047b731-ec09-4d2e-905b-8a0b3f8db93e",
+    "amount": 50,
+    "currency": "USD",
+    "user_id": "user123",
+    "status": "REFUNDED",
+    "created_at": "2026-07-13T14:33:02.044341+00:00"
+  },
+  {
+    "payment_id": "28b5b3e5-1973-4f9c-bd04-c2b84f5f8ade",
+    "amount": 50,
+    "currency": "USD",
+    "user_id": "user_123",
+    "status": "SUCCESS",
+    "created_at": "2026-07-13T14:33:45.802391+00:00"
+  },
+  {
+    "payment_id": "21e37902-5c92-4d64-bd9b-5e94df4f35f9",
+    "amount": 150000,
+    "currency": "USD",
+    "user_id": "user_123",
+    "status": "FAILED",
+    "created_at": "2026-07-13T14:33:45.803466+00:00"
+  },
+  {
+    "payment_id": "82b8db3c-5439-4484-a924-c69387388c10",
+    "amount": 150,
+    "currency": "USD",
+    "user_id": "user_123",
+    "status": "FAILED",
+    "created_at": "2026-07-13T14:33:45.804360+00:00"
+  },
+  {
+    "payment_id": "d72935fb-44de-47e7-84b4-830f97940d7f",
+    "amount": 50,
+    "currency": "USD",
+    "user_id": "user_123",
+    "status": "SUCCESS",
+    "created_at": "2026-07-13T14:33:45.805267+00:00"
+  },
+  {
+    "payment_id": "b16ec6c9-f13c-4cce-9d6b-0670b0d32dc8",
+    "amount": 50,
+    "currency": "USD",
+    "user_id": "user_123",
+    "status": "SUCCESS",
+    "created_at": "2026-07-13T14:33:45.808786+00:00"
+  },
+  {
+    "payment_id": "db808905-f06c-4ff6-ab92-371d1c9c9ef0",
+    "amount": 50,
+    "currency": "USD",
+    "user_id": "user_123",
+    "status": "REFUNDED",
+    "created_at": "2026-07-13T14:33:45.809392+00:00"
+  },
+  {
+    "payment_id": "ce8ef685-64ca-4044-a973-939019fffd55",
+    "amount": 50,
+    "currency": "USD",
+    "user_id": "user_123",
+    "status": "FAILED",
+    "created_at": "2026-07-13T14:33:45.811110+00:00"
+  },
+  {
+    "payment_id": "c25b9eca-ac87-4cc6-9590-2b2f6915058d",
+    "amount": 30,
+    "currency": "USD",
+    "user_id": "user_123",
+    "status": "SUCCESS",
+    "created_at": "2026-07-13T14:33:45.811701+00:00"
+  },
+  {
+    "payment_id": "d108d59a-01bd-4bc1-85b5-0265dc5cac00",
+    "amount": 150,
+    "currency": "USD",
+    "user_id": "user_123",
+    "status": "FAILED",
+    "created_at": "2026-07-13T14:33:45.812277+00:00"
   }
 ]

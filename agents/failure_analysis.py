@@ -3,20 +3,20 @@ import sys
 import json
 from typing import Dict, List
 from dotenv import load_dotenv
-from google import genai
+from openai import OpenAI
 
 # Import from centralized config
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import COVERAGE_THRESHOLD, GEMINI_MODEL
+from config import COVERAGE_THRESHOLD, OPENAI_MODEL
 
 load_dotenv()
 
 
-def get_gemini_client() -> genai.Client:
-    api_key = os.getenv("GEMINI_API_KEY")
+def get_openai_client() -> OpenAI:
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise RuntimeError("GEMINI_API_KEY not set")
-    return genai.Client(api_key=api_key)
+        raise RuntimeError("OPENAI_API_KEY not set")
+    return OpenAI(api_key=api_key)
 
 
 def _safe_json_parse(text: str) -> Dict:
@@ -25,7 +25,15 @@ def _safe_json_parse(text: str) -> Dict:
     Never crashes CI.
     """
     try:
-        return json.loads(text)
+        # Clean up markdown code blocks if present
+        cleaned = text.strip()
+        if cleaned.startswith("```json"):
+            cleaned = cleaned[7:]
+        if cleaned.startswith("```"):
+            cleaned = cleaned[3:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        return json.loads(cleaned.strip())
     except Exception:
         return {
             "failure_type": "unknown",
@@ -35,16 +43,16 @@ def _safe_json_parse(text: str) -> Dict:
         }
 
 
-def gemini_failure_reasoning(
+def openai_failure_reasoning(
     failed_tests: List[str],
     logs: str
 ) -> Dict:
     """
-    Uses Gemini to classify failure root cause.
+    Uses OpenAI to classify failure root cause.
     Always returns a structured dict.
     """
 
-    client = get_gemini_client()
+    client = get_openai_client()
 
     prompt = f"""
 You are a senior software engineer analyzing CI test failures.
@@ -70,12 +78,20 @@ Logs:
 {logs[:1500]}
 """
 
-    response = client.models.generate_content(
-        model=GEMINI_MODEL,
-        contents=prompt
+    response = client.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=[{"role": "user", "content": prompt}]
     )
 
-    return _safe_json_parse(response.text.strip())
+    # Token usage tracking
+    usage = response.usage
+    print(f"\n📊 [Failure Analysis] OpenAI Token Usage:")
+    print(f"   Model: {OPENAI_MODEL}")
+    print(f"   Prompt tokens:     {usage.prompt_tokens}")
+    print(f"   Completion tokens: {usage.completion_tokens}")
+    print(f"   Total tokens:      {usage.total_tokens}")
+
+    return _safe_json_parse(response.choices[0].message.content.strip())
 
 
 def failure_analysis_agent(executor_output: dict) -> dict:
@@ -138,7 +154,7 @@ def failure_analysis_agent(executor_output: dict) -> dict:
     # --------------------------------------------------
     # 4️⃣ LLM fallback (NO UNKNOWN PATH)
     # --------------------------------------------------
-    llm_result = gemini_failure_reasoning(
+    llm_result = openai_failure_reasoning(
         failed_tests=failed_tests,
         logs=logs
     )

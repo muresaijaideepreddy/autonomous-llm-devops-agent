@@ -21,7 +21,7 @@ from typing import AsyncGenerator
 PROJECT_ROOT = Path(__file__).parent.absolute()
 
 # Import from centralized config
-from config import COVERAGE_THRESHOLD, TEST_DIR, ENABLE_COVERAGE_HEALING, MAX_HEALING_ITERATIONS
+from config import COVERAGE_THRESHOLD, TEST_DIR, MAX_HEALING_ITERATIONS
 
 # Import output handlers
 from output_handlers import OutputHandler, CLIOutputHandler, SSEOutputHandler
@@ -41,6 +41,16 @@ class PipelineOrchestrator:
         self.run_id = f"run_{uuid.uuid4().hex[:8]}"
         self.start_time = None
         self.output = output_handler or CLIOutputHandler()
+    
+    @staticmethod
+    def _collect_test_files() -> list:
+        """Collect all test files from the test directory. Single source of truth."""
+        os.makedirs(TEST_DIR, exist_ok=True)
+        return [
+            os.path.join(TEST_DIR, f)
+            for f in os.listdir(TEST_DIR)
+            if f.startswith("test_") and f.endswith(".py")
+        ]
     
     def run_pipeline_sync(self, repo_event: dict) -> dict:
         """Synchronous wrapper for CLI usage."""
@@ -104,12 +114,7 @@ class PipelineOrchestrator:
         # ─────────────────────────────────────────
         # 2️⃣ COLLECT EXISTING TESTS
         # ─────────────────────────────────────────
-        os.makedirs(TEST_DIR, exist_ok=True)
-        test_files = [
-            os.path.join(TEST_DIR, f)
-            for f in os.listdir(TEST_DIR)
-            if f.startswith("test_") and f.endswith(".py")
-        ]
+        test_files = self._collect_test_files()
         
         yield self.output.emit("log", "planner", f"Existing tests found: {len(test_files)}")
         await self.output.delay(0.2)
@@ -209,11 +214,7 @@ class PipelineOrchestrator:
                 await self.output.delay(0.2)
                 
                 # Run ALL test files for accurate combined coverage
-                all_test_files = [
-                    os.path.join(TEST_DIR, f)
-                    for f in os.listdir(TEST_DIR)
-                    if f.startswith("test_") and f.endswith(".py")
-                ]
+                all_test_files = self._collect_test_files()
                 
                 executor_output = executor_agent({
                     "execution_strategy": "pytest",
@@ -404,17 +405,7 @@ def run_pipeline(repo_event: dict) -> dict:
     return orchestrator.run_pipeline_sync(repo_event)
 
 
-# For backward compatibility - StreamingOrchestrator class
-class StreamingOrchestrator(PipelineOrchestrator):
-    """Backward-compatible streaming orchestrator for UI."""
-    
-    def __init__(self):
-        super().__init__(SSEOutputHandler())
-    
-    async def run_pipeline_streaming(self, repo_event: dict) -> AsyncGenerator[str, None]:
-        """Stream pipeline execution events via SSE."""
-        async for event in self._run_pipeline_streaming(repo_event):
-            yield event
+
 
 
 # ─────────────────────────────────────────────
@@ -422,14 +413,22 @@ class StreamingOrchestrator(PipelineOrchestrator):
 # ─────────────────────────────────────────────
 if __name__ == "__main__":
     repo_event = {
-        "changed_files": ["src/payments.py"],
+        "changed_files": [
+            "src/payments.py",
+            "src/auth.py",
+            "src/inventory.py",
+            "src/notifications.py",
+            "src/orders.py",
+            "src/analytics.py",
+        ],
         "commit_id": "abc123",
         "issue": {
             "id": 1,
-            "title": "Negative payment amount causes crash",
-            "description": "System crashes when payment amount is negative",
+            "title": "Major system refactor across all modules",
+            "description": "Refactored core modules for better performance and security",
             "severity": "high"
         }
     }
 
     run_pipeline(repo_event)
+

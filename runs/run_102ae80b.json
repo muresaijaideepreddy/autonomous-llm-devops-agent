@@ -1,0 +1,40 @@
+{
+  "run_id": "run_102ae80b",
+  "planner_output": {
+    "modules_to_test": [
+      "payments"
+    ],
+    "test_types": [
+      "unit",
+      "edge"
+    ],
+    "risk_level": "high",
+    "reason": "high severity issue affecting ['payments']"
+  },
+  "tester_output": {
+    "test_files_created": [
+      "tests/test_payments_auto.py"
+    ],
+    "num_tests_generated": 17
+  },
+  "executor_output": {
+    "status": "fail",
+    "total_tests": 17,
+    "passed_tests": 16,
+    "failed_tests": [
+      "test_process_payment_valid - assert False..."
+    ],
+    "failed_test_files": [
+      "FAILED tests/test_payments_auto.py"
+    ],
+    "coverage_percent": 100.0,
+    "uncovered_files": {},
+    "logs": "============================= test session starts ==============================\nplatform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0\nrootdir: /home/brahmanya/autonomous-llm-devops-agent\nplugins: metadata-3.1.1, cov-7.1.0, anyio-4.14.2, mock-3.15.1, json-report-1.5.0\ncollected 17 items\n\ntests/test_payments_auto.py ........F........                            [100%]\n\n=================================== FAILURES ===================================\n__________________________ test_process_payment_valid __________________________\n\npayment_service = <payments.PaymentService object at 0x71b7c1df4b60>\n\n    def test_process_payment_valid(payment_service):\n        payment_service.add_funds(\"user_1\", 200)\n        result = payment_service.process_payment(\"user_1\", 100, \"USD\")\n>       assert result is True\nE       assert False is True\n\ntests/test_payments_auto.py:70: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_payments_auto.py::test_process_payment_valid - assert False...\n========================= 1 failed, 16 passed in 0.06s =========================\n",
+    "summary_report": "\u274c 1 failed, 16 passed (Total: 17)",
+    "execution_time_ms": 567
+  },
+  "failure_analysis": null,
+  "healing_iterations": 1,
+  "start_time": "2026-07-13T14:05:27.487458+00:00",
+  "end_time": "2026-07-13T14:05:39.704788+00:00"
+}

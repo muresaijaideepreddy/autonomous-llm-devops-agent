@@ -1,0 +1,42 @@
+{
+  "run_id": "run_cad007b5",
+  "planner_output": {
+    "modules_to_test": [
+      "payments"
+    ],
+    "test_types": [
+      "unit",
+      "edge"
+    ],
+    "risk_level": "high",
+    "reason": "high severity issue affecting ['payments']"
+  },
+  "tester_output": {
+    "test_files_created": [
+      "tests/test_payments_auto.py"
+    ],
+    "num_tests_generated": 17
+  },
+  "executor_output": {
+    "status": "fail",
+    "total_tests": 17,
+    "passed_tests": 14,
+    "failed_tests": [
+      "test_payment_service_process_payment_successful",
+      "test_batch_payments_successful - assert [...",
+      "test_export_report - AssertionError: asse..."
+    ],
+    "failed_test_files": [
+      "FAILED tests/test_payments_auto.py"
+    ],
+    "coverage_percent": 100.0,
+    "uncovered_files": {},
+    "logs": "============================= test session starts ==============================\nplatform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0\nrootdir: /home/brahmanya/autonomous-llm-devops-agent\nplugins: langsmith-0.6.6, anyio-4.2.0\ncollected 17 items\n\ntests/test_payments_auto.py ...........F...FF                            [100%]\n\n=================================== FAILURES ===================================\n_______________ test_payment_service_process_payment_successful ________________\n\npayment_repo = <payments.PaymentRepository object at 0x73e157d263c0>\n\n    def test_payment_service_process_payment_successful(payment_repo):\n        service = PaymentService(repo=payment_repo)\n        service.add_funds(\"user123\", 100)\n        result = service.process_payment(\"user123\", 50, \"USD\")\n>       assert result is True\nE       assert False is True\n\ntests/test_payments_auto.py:94: AssertionError\n________________________ test_batch_payments_successful ________________________\n\n    def test_batch_payments_successful():\n        service = PaymentService()\n        service.add_funds(\"user123\", 100)\n        payments = [(50, \"USD\"), (20, \"USD\"), (30, \"USD\")]\n        results = batch_payments(service, \"user123\", payments)\n>       assert results == [True, True, False]\nE       assert [True, False, True] == [True, True, False]\nE         \nE         At index 1 diff: False != True\nE         Use -v to get more diff\n\ntests/test_payments_auto.py:122: AssertionError\n______________________________ test_export_report ______________________________\n\npayment_repo = <payments.PaymentRepository object at 0x73e157d26060>\n\n    def test_export_report(payment_repo):\n        service = PaymentService(repo=payment_repo)\n        service.add_funds(\"user123\", 100)\n        export_report(service, path=payment_repo.path)\n        with open(payment_repo.path, \"r\") as f:\n            report = json.load(f)\n        assert report[\"user123\"][\"balance\"] == 100\n>       assert report[\"user123\"][\"transactions\"] == []\nE       AssertionError: assert [['CREDIT', 100]] == []\nE         \nE         Left contains one more item: ['CREDIT', 100]\nE         Use -v to get more diff\n\ntests/test_payments_auto.py:131: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_payments_auto.py::test_payment_service_process_payment_successful\nFAILED tests/test_payments_auto.py::test_batch_payments_successful - assert [...\nFAILED tests/test_payments_auto.py::test_export_report - AssertionError: asse...\n========================= 3 failed, 14 passed in 0.08s =========================\n",
+    "summary_report": "\u274c 3 failed, 14 passed (Total: 17)",
+    "execution_time_ms": 933
+  },
+  "failure_analysis": null,
+  "healing_iterations": 1,
+  "start_time": "2026-07-13T14:18:02.342711+00:00",
+  "end_time": "2026-07-13T14:18:26.169564+00:00"
+}

@@ -24,5 +24,7 @@ MAX_TESTS_BY_SEVERITY = {
 }
 
 # LLM Configuration
-GEMINI_MODEL = "models/gemini-2.5-flash"
+LLM_PROVIDER = "openai"  # "openai" or "gemini"
+OPENAI_MODEL = "gpt-4o-mini"
+GEMINI_MODEL = "models/gemini-2.5-flash"  # Kept for reference
 MAX_RETRIES = 2

@@ -231,14 +231,17 @@ def healing_agent(
     # Generate recommendation
     if not needs_healing:
         report["recommendation"] = "Coverage threshold met. No action needed."
-        print(f"  ✅ Coverage: {coverage_percent:.2f}% (threshold: {COVERAGE_THRESHOLD}%)")
+        cov_display = f"{coverage_percent:.2f}" if coverage_percent is not None else "N/A"
+        print(f"  ✅ Coverage: {cov_display}% (threshold: {COVERAGE_THRESHOLD}%)")
     else:
         total_uncovered = sum(len(lines) for lines in uncovered.values())
         report["recommendation"] = (
             f"Generate targeted tests for {total_uncovered} uncovered lines "
             f"across {len(coverage_context)} module(s)."
         )
-        print(f"  ⚠️ Coverage: {coverage_percent:.2f}% (need {coverage_gap:.2f}% more)")
+        cov_display = f"{coverage_percent:.2f}" if coverage_percent is not None else "N/A"
+        gap_display = f"{coverage_gap:.2f}" if coverage_percent is not None else "N/A"
+        print(f"  ⚠️ Coverage: {cov_display}% (need {gap_display}% more)")
         print(f"  📝 Modules needing tests: {list(coverage_context.keys())}")
     
     if dead_code:

@@ -1,18 +1,23 @@
 import os
+import sys
 from dotenv import load_dotenv
-from google import genai
+from openai import OpenAI
 
 load_dotenv()
+
+# Import from centralized config
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import OPENAI_MODEL
 
 # -----------------------------
 # LLM CLIENT
 # -----------------------------
 
-def get_gemini_client():
-    api_key = os.getenv("GEMINI_API_KEY")
+def get_openai_client():
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise RuntimeError("GEMINI_API_KEY not set")
-    return genai.Client(api_key=api_key)
+        raise RuntimeError("OPENAI_API_KEY not set")
+    return OpenAI(api_key=api_key)
 
 # -----------------------------
 # SEVERITY CLASSIFIER (LLM)
@@ -24,7 +29,7 @@ def classify_severity_with_llm(issue: dict, changed_files: list) -> str:
     Returns: low | medium | high
     """
 
-    client = get_gemini_client()
+    client = get_openai_client()
 
     title = issue.get("title", "")
     description = issue.get("description", "")
@@ -45,12 +50,20 @@ Changed files: {changed_files}
 Output ONLY one word.
 """
 
-    response = client.models.generate_content(
-        model="models/gemini-2.5-flash",
-        contents=prompt
+    response = client.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=[{"role": "user", "content": prompt}]
     )
 
-    severity = response.text.strip().lower()
+    # Token usage tracking
+    usage = response.usage
+    print(f"\n📊 [Planner] OpenAI Token Usage:")
+    print(f"   Model: {OPENAI_MODEL}")
+    print(f"   Prompt tokens:     {usage.prompt_tokens}")
+    print(f"   Completion tokens: {usage.completion_tokens}")
+    print(f"   Total tokens:      {usage.total_tokens}")
+
+    severity = response.choices[0].message.content.strip().lower()
 
     if severity not in {"low", "medium", "high"}:
         return "low"

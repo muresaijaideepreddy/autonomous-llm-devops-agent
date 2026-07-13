@@ -1,7 +1,7 @@
 """
 Tester Agent (Simplified)
 ==========================
-Automatically generates pytest unit tests using an LLM (Gemini).
+Automatically generates pytest unit tests using an LLM (OpenAI).
 
 Key features:
 - Severity-based test count control
@@ -15,32 +15,24 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
+import sys
 import ast
 from typing import Dict, List, Optional
-from google import genai
+from openai import OpenAI
 
-# -----------------------------
-# CONFIGURATION
-# -----------------------------
-
-MAX_TESTS_BY_SEVERITY = {
-    "low": 12,
-    "medium": 15,
-    "high": 20
-}
-
-MAX_RETRIES = 2
-GEMINI_MODEL = "models/gemini-2.5-flash"
+# Import from centralized config
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import OPENAI_MODEL, MAX_RETRIES, MAX_TESTS_BY_SEVERITY
 
 # -----------------------------
 # LLM CLIENT
 # -----------------------------
 
-def get_gemini_client() -> genai.Client:
-    api_key = os.getenv("GEMINI_API_KEY")
+def get_openai_client() -> OpenAI:
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise RuntimeError("GEMINI_API_KEY environment variable not set")
-    return genai.Client(api_key=api_key)
+        raise RuntimeError("OPENAI_API_KEY environment variable not set")
+    return OpenAI(api_key=api_key)
 
 # -----------------------------
 # UTILS
@@ -65,15 +57,15 @@ def test_{module}_fallback():
 # LLM GENERATION
 # -----------------------------
 
-def generate_tests_with_gemini(
-    client: genai.Client,
+def generate_tests_with_openai(
+    client: OpenAI,
     source_code: str,
     module: str,
     risk_level: str,
     coverage_context: Optional[dict] = None
 ) -> str:
     """
-    Generate pytest tests using Gemini.
+    Generate pytest tests using OpenAI.
     Uses coverage context to target uncovered code.
     """
 
@@ -155,12 +147,21 @@ Source Code (READ THIS CAREFULLY):
 {source_code}
 """
 
-    response = client.models.generate_content(
-        model=GEMINI_MODEL,
-        contents=prompt
+    response = client.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=[{"role": "user", "content": prompt}]
     )
 
-    result = response.text.strip()
+    # Token usage tracking
+    usage = response.usage
+    print(f"\n📊 [Tester] OpenAI Token Usage:")
+    print(f"   Model: {OPENAI_MODEL}")
+    print(f"   Prompt tokens:     {usage.prompt_tokens}")
+    print(f"   Completion tokens: {usage.completion_tokens}")
+    print(f"   Total tokens:      {usage.total_tokens}")
+    print(f"   Est. cost: ${(usage.prompt_tokens * 0.15 / 1_000_000) + (usage.completion_tokens * 0.60 / 1_000_000):.6f}")
+
+    result = response.choices[0].message.content.strip()
     
     # Clean up markdown code blocks if present
     if result.startswith("```python"):
@@ -193,7 +194,7 @@ def tester_agent(plan: Dict) -> Dict:
     coverage_context: Optional[dict] = plan.get("coverage_context")
 
     os.makedirs("tests", exist_ok=True)
-    client = get_gemini_client()
+    client = get_openai_client()
 
     created_files: List[str] = []
     total_tests = 0
@@ -223,7 +224,7 @@ def tester_agent(plan: Dict) -> Dict:
         for attempt in range(1, MAX_RETRIES + 1):
             print(f"🔁 Generating tests for {module} (attempt {attempt})")
 
-            generated = generate_tests_with_gemini(
+            generated = generate_tests_with_openai(
                 client=client,
                 source_code=source_code,
                 module=module,
